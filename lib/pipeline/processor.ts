@@ -183,10 +183,12 @@ export async function processPodcast(
 
       // BGMファイルをFFmpegのFSに書き込み
       if (config.bgm instanceof File) {
-        await ffmpeg.writeFile('bgm.mp3', await fetchFile(config.bgm));
+        const bgmData = await fetchFile(config.bgm);
+        console.log('[Processor] BGMファイル読み込み完了:', bgmData.byteLength, 'bytes');
+        await ffmpeg.writeFile('bgm.mp3', bgmData);
+        console.log('[Processor] BGMファイル書き込み完了');
       } else {
-        // 既にFS内にある場合
-        await ffmpeg.writeFile('bgm.mp3', await fetchFile(config.bgm));
+        throw new Error('BGMファイルが不正です');
       }
 
       await addBGM(
@@ -211,9 +213,12 @@ export async function processPodcast(
 
       // エンドシーンファイルをFFmpegのFSに書き込み
       if (config.endscene instanceof File) {
-        await ffmpeg.writeFile('endscene.mp3', await fetchFile(config.endscene));
+        const endsceneData = await fetchFile(config.endscene);
+        console.log('[Processor] エンドシーンファイル読み込み完了:', endsceneData.byteLength, 'bytes');
+        await ffmpeg.writeFile('endscene.mp3', endsceneData);
+        console.log('[Processor] エンドシーンファイル書き込み完了');
       } else {
-        await ffmpeg.writeFile('endscene.mp3', await fetchFile(config.endscene));
+        throw new Error('エンドシーンファイルが不正です');
       }
 
       await appendEndscene(
