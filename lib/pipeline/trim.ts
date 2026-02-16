@@ -115,16 +115,21 @@ export async function applySyncAndTrim(
 
   console.log(`[Trim] カット位置: A=${cutA.toFixed(3)}s, B=${cutB.toFixed(3)}s`);
 
-  // FFmpegでトリム実行（WAV形式で出力）
+  // FFmpegでトリム実行（WAV形式、モノラル、サンプルレート削減でメモリ節約）
   const inputA = 'input_a.mp3';
   const inputB = 'input_b.mp3';
 
+  // メモリ節約のため、モノラル変換とサンプルレート44.1kHzに統一
   await ffmpeg.exec([
     '-y',
     '-ss',
     cutA.toFixed(3),
     '-i',
     inputA,
+    '-ac',
+    '1', // モノラル化
+    '-ar',
+    '44100', // サンプルレート44.1kHz
     outputA,
   ]);
 
@@ -134,6 +139,10 @@ export async function applySyncAndTrim(
     cutB.toFixed(3),
     '-i',
     inputB,
+    '-ac',
+    '1', // モノラル化
+    '-ar',
+    '44100', // サンプルレート44.1kHz
     outputB,
   ]);
 
