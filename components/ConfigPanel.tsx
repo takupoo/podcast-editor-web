@@ -11,11 +11,13 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
+import { generateShareUrl } from '@/lib/config-url';
 
 export function ConfigPanel() {
   const { config, updateConfig } = useAppStore();
   const [bgmFile, setBgmFile] = useState<File | null>(null);
   const [endsceneFile, setEndsceneFile] = useState<File | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleBgmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,9 +45,29 @@ export function ConfigPanel() {
     updateConfig({ endscene: undefined });
   };
 
+  const handleShareConfig = async () => {
+    const shareUrl = generateShareUrl(config);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      alert('URLのコピーに失敗しました: ' + error);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-xl font-semibold mb-4">詳細設定</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">詳細設定</h2>
+        <button
+          onClick={handleShareConfig}
+          className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+        >
+          {copied ? '✓ コピー済み' : '設定を共有'}
+        </button>
+      </div>
 
       <Accordion type="multiple" defaultValue={['trim']} className="w-full">
         {/* 基本設定 */}

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ProcessConfig, ProcessProgress } from './pipeline/types';
 import { DEFAULT_CONFIG } from './config';
+import { loadConfigFromUrl, mergeConfigWithDefaults } from './config-url';
 
 interface AppState {
   // 設定
@@ -26,11 +27,15 @@ interface AppState {
   setResult: (result: Blob | null) => void;
 }
 
+// URLパラメータから設定を読み込み（初期化時のみ）
+const urlConfig = loadConfigFromUrl();
+const initialConfig = mergeConfigWithDefaults(urlConfig);
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       // 設定
-      config: DEFAULT_CONFIG,
+      config: initialConfig,
       updateConfig: (updates) =>
         set((state) => ({
           config: { ...state.config, ...updates },
