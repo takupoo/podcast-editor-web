@@ -252,7 +252,8 @@ export async function processPodcast(
     const data = await ffmpeg.readFile(outputFile);
     const mimeType =
       config.output_format === 'mp3' ? 'audio/mpeg' : 'audio/wav';
-    const blob = new Blob([data], { type: mimeType });
+    const uint8Array = new Uint8Array(data as Uint8Array);
+    const blob = new Blob([uint8Array], { type: mimeType });
 
     onProgress({
       stage: 'complete',

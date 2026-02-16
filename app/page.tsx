@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileUploader } from '@/components/FileUploader';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
+import { ConfigPanel } from '@/components/ConfigPanel';
 import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
@@ -66,6 +67,11 @@ export default function Home() {
           />
         </div>
 
+        {/* 詳細設定 */}
+        <div className="mb-8">
+          <ConfigPanel />
+        </div>
+
         {/* 処理ボタン */}
         <div className="text-center mb-8">
           <button
@@ -109,14 +115,16 @@ export default function Home() {
           <h2 className="text-lg font-semibold mb-3">処理内容</h2>
           <ul className="text-sm text-gray-600 space-y-1">
             <li>✓ クラップ検出・同期（録音開始時の手拍子で2トラックを自動同期）</li>
-            <li>✓ ノイズ除去（FFmpeg afftdnフィルタ）</li>
+            <li>⏸ ノイズ除去（一時無効、Week 3で改善予定）</li>
             <li>✓ ラウドネス正規化（-16 LUFS）</li>
             <li>✓ ダイナミクス処理（コンプレッサー + リミッター）</li>
             <li>✓ ステレオミックス</li>
-            <li>✓ MP3エンコード（192kbps）</li>
+            <li>✓ BGM追加（オプション、自動ループ・フェード）</li>
+            <li>✓ エンドシーン追加（オプション、クロスフェード）</li>
+            <li>✓ MP3/WAVエンコード（ビットレート調整可能）</li>
           </ul>
           <p className="text-xs text-gray-500 mt-4">
-            Week 2版: 基本機能完成。Week 3で設定UI・BGM/Endscene実装予定
+            Week 3版: 詳細設定UI実装完了。全パラメータ調整可能
           </p>
         </div>
       </div>
