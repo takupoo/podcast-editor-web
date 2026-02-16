@@ -3,11 +3,11 @@ import { ProcessConfig } from './pipeline/types';
 export const DEFAULT_CONFIG: ProcessConfig = {
   // Stage 1: Trim
   pre_clap_margin: 0.5,
-  post_clap_cut: 0.0,
+  post_clap_cut: 1.0,  // クラップの1秒後からカット（クラップ音を除去）
   clap_threshold_db: -10.0,
 
   // Stage 2: Denoise
-  denoise_enabled: true,
+  denoise_enabled: false, // 一旦無効化（afftdnフィルタに問題あり、Week 3で再実装予定）
   noise_gate_threshold: -40.0,
 
   // Stage 3: Loudness

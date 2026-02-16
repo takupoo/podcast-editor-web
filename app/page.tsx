@@ -108,13 +108,15 @@ export default function Home() {
         <div className="mt-12 p-6 bg-white rounded-lg shadow-sm">
           <h2 className="text-lg font-semibold mb-3">処理内容</h2>
           <ul className="text-sm text-gray-600 space-y-1">
+            <li>✓ クラップ検出・同期（録音開始時の手拍子で2トラックを自動同期）</li>
+            <li>✓ ノイズ除去（FFmpeg afftdnフィルタ）</li>
             <li>✓ ラウドネス正規化（-16 LUFS）</li>
             <li>✓ ダイナミクス処理（コンプレッサー + リミッター）</li>
             <li>✓ ステレオミックス</li>
             <li>✓ MP3エンコード（192kbps）</li>
           </ul>
           <p className="text-xs text-gray-500 mt-4">
-            Week 1版: Trim（クラップ検出）とDenoiseは後日実装予定
+            Week 2版: 基本機能完成。Week 3で設定UI・BGM/Endscene実装予定
           </p>
         </div>
       </div>

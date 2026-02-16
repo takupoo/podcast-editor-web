@@ -2,12 +2,14 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { ProcessConfig, ProcessProgress } from './types';
 import { loadFFmpeg } from '../ffmpeg-worker';
+import { applySyncAndTrim } from './trim';
+import { applyDenoise } from './denoise';
 import { normalizeLoudness } from './loudness';
 import { applyDynamics } from './dynamics';
 import { mixVoices, addBGM, appendEndscene, exportMP3 } from './mix';
 
 /**
- * ポッドキャスト処理パイプライン（Week 1版: TrimとDenoiseはスキップ）
+ * ポッドキャスト処理パイプライン（完全版）
  * @param fileA 話者Aの音声ファイル
  * @param fileB 話者Bの音声ファイル
  * @param config 処理設定
@@ -52,15 +54,62 @@ export async function processPodcast(
       throw new Error(`ファイルの書き込みに失敗しました: ${error}`);
     }
 
+    // Stage 1: Trim（クラップ検出・同期）
+    onProgress({
+      stage: 'trim',
+      percent: 10,
+      message: 'クラップを検出中...',
+    });
+
+    await applySyncAndTrim(
+      ffmpeg,
+      fileA,
+      fileB,
+      'trimmed_a.wav',
+      'trimmed_b.wav',
+      config.pre_clap_margin,
+      config.post_clap_cut,
+      config.clap_threshold_db
+    );
+
+    let currentFileA = 'trimmed_a.wav';
+    let currentFileB = 'trimmed_b.wav';
+
+    // Stage 2: Denoise（ノイズ除去）
+    if (config.denoise_enabled) {
+      onProgress({
+        stage: 'denoise',
+        percent: 15,
+        message: 'ノイズを除去中...',
+      });
+
+      await applyDenoise(
+        ffmpeg,
+        currentFileA,
+        'denoised_a.wav',
+        config.noise_gate_threshold
+      );
+
+      await applyDenoise(
+        ffmpeg,
+        currentFileB,
+        'denoised_b.wav',
+        config.noise_gate_threshold
+      );
+
+      currentFileA = 'denoised_a.wav';
+      currentFileB = 'denoised_b.wav';
+    }
+
     // Stage 3: Loudness正規化
     onProgress({
       stage: 'loudness',
-      percent: 20,
+      percent: 25,
       message: 'ラウドネスを正規化中（話者A）...',
     });
     await normalizeLoudness(
       ffmpeg,
-      'input_a.mp3',
+      currentFileA,
       'loud_a.wav',
       config.target_lufs,
       config.true_peak,
@@ -69,12 +118,12 @@ export async function processPodcast(
 
     onProgress({
       stage: 'loudness',
-      percent: 30,
+      percent: 35,
       message: 'ラウドネスを正規化中（話者B）...',
     });
     await normalizeLoudness(
       ffmpeg,
-      'input_b.mp3',
+      currentFileB,
       'loud_b.wav',
       config.target_lufs,
       config.true_peak,
