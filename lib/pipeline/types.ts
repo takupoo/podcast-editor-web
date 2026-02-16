@@ -1,0 +1,77 @@
+/**
+ * 処理パイプラインの型定義
+ */
+
+export interface ProcessConfig {
+  // Stage 1: Trim
+  pre_clap_margin: number;      // クラップ前の余白（秒）
+  post_clap_cut: number;         // 0=クラップ残す, >0=クラップ後N秒からカット
+  clap_threshold_db: number;     // クラップ検出閾値（dB）
+
+  // Stage 2: Denoise
+  denoise_enabled: boolean;
+  noise_gate_threshold: number;  // ノイズゲート閾値（dB）簡易版用
+
+  // Stage 3: Loudness
+  target_lufs: number;           // -16.0 LUFS（ポッドキャスト標準）
+  true_peak: number;             // -1.5 dBTP
+  lra: number;                   // 11.0 LU
+
+  // Stage 4: Dynamics
+  comp_threshold: string;        // '-20dB'
+  comp_ratio: number;            // 4:1
+  comp_attack: number;           // ms
+  comp_release: number;          // ms
+  limiter_limit: string;         // '-1dB'
+
+  // Stage 5-6: Mix
+  bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト
+  bgm_volume_db: number;         // -30.0 dB
+  bgm_fade_in: number;           // 3.0秒
+  bgm_fade_out: number;          // 3.0秒
+
+  // Stage 7: Endscene
+  endscene?: string | File;      // エンドシーンファイル
+  endscene_crossfade: number;    // 2.0秒
+
+  // Stage 8: Export
+  mp3_bitrate: string;           // '192k'
+  output_format: 'mp3' | 'wav';
+}
+
+export interface ProcessProgress {
+  stage: ProcessStage;
+  percent: number;
+  message?: string;
+}
+
+export type ProcessStage =
+  | 'loading'
+  | 'trim'
+  | 'denoise'
+  | 'loudness'
+  | 'dynamics'
+  | 'mix'
+  | 'bgm'
+  | 'endscene'
+  | 'export'
+  | 'complete'
+  | 'error';
+
+export interface TrimResult {
+  cutA: number;  // 秒単位
+  cutB: number;  // 秒単位
+}
+
+export interface LoudnessStats {
+  input_i: string;
+  input_tp: string;
+  input_lra: string;
+  input_thresh: string;
+  output_i: string;
+  output_tp: string;
+  output_lra: string;
+  output_thresh: string;
+  normalization_type: string;
+  target_offset: string;
+}
