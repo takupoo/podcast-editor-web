@@ -115,7 +115,7 @@ export default function Home() {
           <h2 className="text-lg font-semibold mb-3">処理内容</h2>
           <ul className="text-sm text-gray-600 space-y-1">
             <li>✓ クラップ検出・同期（録音開始時の手拍子で2トラックを自動同期）</li>
-            <li>⏸ ノイズ除去（一時無効、Week 3で改善予定）</li>
+            <li>✓ ノイズ除去（ノイズゲート + ハイ/ローパスフィルタ）</li>
             <li>✓ ラウドネス正規化（-16 LUFS）</li>
             <li>✓ ダイナミクス処理（コンプレッサー + リミッター）</li>
             <li>✓ ステレオミックス</li>

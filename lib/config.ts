@@ -7,7 +7,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   clap_threshold_db: -10.0,
 
   // Stage 2: Denoise
-  denoise_enabled: false, // 一旦無効化（afftdnフィルタに問題あり、Week 3で再実装予定）
+  denoise_enabled: true,
   noise_gate_threshold: -40.0,
 
   // Stage 3: Loudness

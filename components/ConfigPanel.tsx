@@ -122,7 +122,7 @@ export function ConfigPanel() {
               <div>
                 <Label htmlFor="denoise-enabled">ノイズ除去</Label>
                 <p className="text-xs text-gray-500">
-                  ※現在一時無効（Week 3で改善予定）
+                  ノイズゲート + ハイ/ローパスフィルタ
                 </p>
               </div>
               <Switch
@@ -131,9 +131,29 @@ export function ConfigPanel() {
                 onCheckedChange={(checked) =>
                   updateConfig({ denoise_enabled: checked })
                 }
-                disabled
               />
             </div>
+
+            {config.denoise_enabled && (
+              <div>
+                <Label htmlFor="noise-gate-threshold">
+                  ノイズゲート閾値: {config.noise_gate_threshold}dB
+                </Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  低いほど弱いノイズも除去（推奨: -40dB）
+                </p>
+                <Slider
+                  id="noise-gate-threshold"
+                  min={-60}
+                  max={-20}
+                  step={5}
+                  value={[config.noise_gate_threshold]}
+                  onValueChange={([value]) =>
+                    updateConfig({ noise_gate_threshold: value })
+                  }
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="target-lufs">
