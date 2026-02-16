@@ -7,8 +7,8 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   clap_threshold_db: -10.0,
 
   // Stage 2: Denoise
-  denoise_enabled: true,
-  noise_gate_threshold: -50.0, // 穏やかな設定（音声を消さないように）
+  denoise_enabled: false, // デフォルトOFF（ハイ/ローパスフィルタのみ、ノイズゲートなし）
+  noise_gate_threshold: -50.0,
 
   // Stage 3: Loudness
   target_lufs: -16.0,

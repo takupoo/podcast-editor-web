@@ -24,17 +24,14 @@ export async function applyDenoise(
 ): Promise<void> {
   console.log(`[Denoise] ノイズ除去開始: ${inputFile}`);
 
-  // ノイズ除去フィルタチェーン
+  // ノイズ除去フィルタチェーン（agateは音声を消すため除外）
   // 1. highpass=f=80 → 80Hz以下の低周波ノイズ（エアコン、機械音など）を除去
-  // 2. agate → ノイズゲート（閾値以下の音を減衰）
-  //    - threshold: 閾値（dB）※音声を消さないよう穏やかな設定
-  //    - ratio: 圧縮比（2:1程度で穏やかに）
-  //    - attack: アタックタイム（20ms で自然に）
-  //    - release: リリースタイム（250ms で自然に）
-  // 3. lowpass=f=12000 → 12kHz以上の高周波ノイズ（ヒスノイズなど）を除去
+  // 2. lowpass=f=12000 → 12kHz以上の高周波ノイズ（ヒスノイズなど）を除去
+  //
+  // 注: Python版のnoisereduce（スペクトラルゲーティング）と同等の機能は
+  //     FFmpeg.wasmでは利用できないため、基本的なフィルタリングのみ実装
   const af = [
     'highpass=f=80',
-    `agate=threshold=${threshold}dB:ratio=2:attack=20:release=250`,
     'lowpass=f=12000',
   ].join(',');
 
