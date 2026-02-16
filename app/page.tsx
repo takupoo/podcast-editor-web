@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileUploader } from '@/components/FileUploader';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
@@ -14,6 +14,30 @@ export default function Home() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<ProcessProgress | null>(null);
   const [result, setResult] = useState<Blob | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // 通知許可をリクエスト
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          setNotificationPermission(permission);
+        });
+      }
+    }
+  }, []);
+
+  // ブラウザ通知を送信
+  const sendNotification = (title: string, body: string) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+      });
+    }
+  };
 
   const handleProcess = async () => {
     if (!fileA || !fileB) return;
@@ -27,6 +51,12 @@ export default function Home() {
         setProgress(p);
       });
       setResult(output);
+
+      // 処理完了通知
+      sendNotification(
+        '処理完了！',
+        'ポッドキャストの編集が完了しました。ダウンロードできます。'
+      );
     } catch (error) {
       console.error('処理エラー:', error);
       setProgress({
@@ -34,6 +64,12 @@ export default function Home() {
         percent: 0,
         message: `エラーが発生しました: ${error}`,
       });
+
+      // エラー通知
+      sendNotification(
+        '処理エラー',
+        'ポッドキャストの編集中にエラーが発生しました。'
+      );
     } finally {
       setProcessing(false);
     }
@@ -94,6 +130,16 @@ export default function Home() {
               両方のファイルを選択してください
             </p>
           ) : null}
+          {notificationPermission === 'granted' && (
+            <p className="text-xs text-green-600 mt-2">
+              🔔 処理完了時にブラウザ通知します
+            </p>
+          )}
+          {notificationPermission === 'denied' && (
+            <p className="text-xs text-gray-500 mt-2">
+              通知が無効です（ブラウザ設定で有効にできます）
+            </p>
+          )}
         </div>
 
         {/* 処理進捗 */}
