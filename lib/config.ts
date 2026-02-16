@@ -8,7 +8,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
 
   // Stage 2: Denoise
   denoise_enabled: true,
-  noise_gate_threshold: -40.0,
+  noise_gate_threshold: -50.0, // 穏やかな設定（音声を消さないように）
 
   // Stage 3: Loudness
   target_lufs: -16.0,

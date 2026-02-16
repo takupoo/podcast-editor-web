@@ -27,14 +27,14 @@ export async function applyDenoise(
   // ノイズ除去フィルタチェーン
   // 1. highpass=f=80 → 80Hz以下の低周波ノイズ（エアコン、機械音など）を除去
   // 2. agate → ノイズゲート（閾値以下の音を減衰）
-  //    - threshold: 閾値（dB）
-  //    - ratio: 圧縮比（高いほど強力）
-  //    - attack: アタックタイム（ms）
-  //    - release: リリースタイム（ms）
+  //    - threshold: 閾値（dB）※音声を消さないよう穏やかな設定
+  //    - ratio: 圧縮比（2:1程度で穏やかに）
+  //    - attack: アタックタイム（20ms で自然に）
+  //    - release: リリースタイム（250ms で自然に）
   // 3. lowpass=f=12000 → 12kHz以上の高周波ノイズ（ヒスノイズなど）を除去
   const af = [
     'highpass=f=80',
-    `agate=threshold=${threshold}dB:ratio=10:attack=10:release=100`,
+    `agate=threshold=${threshold}dB:ratio=2:attack=20:release=250`,
     'lowpass=f=12000',
   ].join(',');
 
