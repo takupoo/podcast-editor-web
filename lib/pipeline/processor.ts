@@ -16,7 +16,7 @@ import { execFF } from './exec';
 async function safeDelete(ffmpeg: FFmpeg, name: string): Promise<void> {
   try {
     await ffmpeg.deleteFile(name);
-  } catch (_) {
+  } catch {
     // 存在しない / 削除不可の場合は無視
   }
 }
@@ -35,11 +35,15 @@ export async function processPodcast(
   config: ProcessConfig,
   onProgress: (progress: ProcessProgress) => void
 ): Promise<Blob> {
+  // finally でアクセスできるよう関数スコープで宣言
+  let ffmpeg: FFmpeg | null = null;
+  let abortWatcher: ((log: { message: string }) => void) | null = null;
+
   try {
     // FFmpegロード
     console.log('[Processor] FFmpegロード開始');
     onProgress({ stage: 'loading', percent: 0, message: 'FFmpegを読み込み中...' });
-    let ffmpeg = await loadFFmpeg((ratio) => {
+    ffmpeg = await loadFFmpeg((ratio) => {
       onProgress({
         stage: 'loading',
         percent: ratio * 10,
@@ -51,7 +55,7 @@ export async function processPodcast(
     // Aborted() を検出するグローバルウォッチャー
     // appendEndscene などの concat フィルタが WASM cleanup で abort() を呼ぶ場合がある
     let wasmAborted = false;
-    const abortWatcher = ({ message }: { message: string }) => {
+    abortWatcher = ({ message }: { message: string }) => {
       if (message.includes('Aborted()')) {
         wasmAborted = true;
         console.warn('[Processor] WASM Aborted() を検出');
@@ -375,5 +379,9 @@ export async function processPodcast(
       message: `エラーが発生しました: ${error}`,
     });
     throw error;
+  } finally {
+    if (ffmpeg && abortWatcher) {
+      ffmpeg.off('log', abortWatcher);
+    }
   }
 }

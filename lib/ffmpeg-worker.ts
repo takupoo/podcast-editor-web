@@ -68,7 +68,7 @@ export async function reloadFFmpeg(
   onProgress?: (ratio: number) => void
 ): Promise<FFmpeg> {
   if (ffmpeg) {
-    try { ffmpeg.terminate(); } catch (_) {} // Worker を終了してリソースを解放
+    try { ffmpeg.terminate(); } catch {} // Worker を終了してリソースを解放
   }
   ffmpeg = null; // シングルトンを無効化して新規インスタンスを作成
   return loadFFmpeg(onProgress);

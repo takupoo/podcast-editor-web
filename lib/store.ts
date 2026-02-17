@@ -60,18 +60,26 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'podcast-processor-storage',
-      // ファイルや結果は永続化しない
+      // ファイルや結果は永続化しない（bgm/endsceneはFileオブジェクトのためJSON化不可）
       partialize: (state) => ({
-        config: state.config,
+        config: {
+          ...state.config,
+          bgm: undefined,
+          endscene: undefined,
+        },
       }),
       // localStorageから読み込んだ設定をデフォルト値とマージ
       merge: (persistedState, currentState) => {
         const ps = persistedState as Partial<AppState>;
+        const urlConfig = loadConfigFromUrl(); // URLパラメータを再取得
         const merged: AppState = {
           ...currentState,
           config: {
-            ...DEFAULT_CONFIG, // デフォルト値を先に展開
-            ...(ps?.config ?? {}), // 保存された値で上書き
+            ...DEFAULT_CONFIG,      // デフォルト値を先に展開
+            ...(ps?.config ?? {}),  // 保存された値で上書き
+            ...urlConfig,           // URLパラメータを最優先
+            bgm: undefined,         // Fileオブジェクトは localStorage から復元不可（旧データの {} を除去）
+            endscene: undefined,    // 同上
           },
         };
         return merged;

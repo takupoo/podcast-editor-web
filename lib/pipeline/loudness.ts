@@ -11,7 +11,7 @@ async function measureLoudness(
   ffmpeg: FFmpeg,
   inputFile: string
 ): Promise<LoudnessStats> {
-  let logMessages: string[] = [];
+  const logMessages: string[] = [];
 
   const logHandler = ({ message }: { message: string }) => {
     logMessages.push(message);
@@ -32,7 +32,7 @@ async function measureLoudness(
       '-f', 'null',
       '-',
     ]);
-  } catch (_e) {
+  } catch {
     // FFmpeg.wasmではAborted()で例外が出ることがあるが、ログは収集できている
   } finally {
     ffmpeg.off('log', logHandler);

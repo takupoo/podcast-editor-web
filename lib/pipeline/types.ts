@@ -32,6 +32,7 @@ export interface ProcessConfig {
   // Stage 5-6: Mix
   bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト（非永続化）
   bgm_filename?: string;         // BGMファイル名（永続化・共有URL用）
+  bgm_url?: string;              // BGM URL（URL入力方式で永続化）
   bgm_volume_db: number;         // -30.0 dB
   bgm_fade_in: number;           // 3.0秒
   bgm_fade_out: number;          // 3.0秒
@@ -39,6 +40,7 @@ export interface ProcessConfig {
   // Stage 7: Endscene
   endscene?: string | File;      // エンドシーンファイル（非永続化）
   endscene_filename?: string;    // エンドシーンファイル名（永続化・共有URL用）
+  endscene_url?: string;         // エンドシーン URL（URL入力方式で永続化）
   endscene_crossfade: number;    // 2.0秒
 
   // Stage 8: Export

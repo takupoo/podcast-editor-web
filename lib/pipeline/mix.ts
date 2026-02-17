@@ -124,7 +124,7 @@ export async function appendEndscene(
   const mainDuration = await getDuration(ffmpeg, mainPath);
 
   const filterComplex = [
-    `[0:a]afade=t=out:st=${mainDuration - crossfadeSec}:d=${crossfadeSec}[main]`,
+    `[0:a]afade=t=out:st=${Math.max(0, mainDuration - crossfadeSec)}:d=${crossfadeSec}[main]`,
     `[1:a]afade=t=in:d=${crossfadeSec}[end]`,
     '[main][end]concat=n=2:v=0:a=1',
   ].join(';');

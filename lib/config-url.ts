@@ -13,8 +13,11 @@ export function encodeConfigToUrl(config: ProcessConfig): string {
   };
 
   const json = JSON.stringify(serializable);
-  const base64 = btoa(json);
-  return base64;
+  // btoa は Latin-1 のみ対応。TextEncoder で UTF-8 バイト列に変換してから base64 化
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 /**
@@ -22,7 +25,9 @@ export function encodeConfigToUrl(config: ProcessConfig): string {
  */
 export function decodeConfigFromUrl(base64: string): Partial<ProcessConfig> {
   try {
-    const json = atob(base64);
+    const binary = atob(base64);
+    const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+    const json = new TextDecoder().decode(bytes);
     const config = JSON.parse(json);
     return config;
   } catch (error) {

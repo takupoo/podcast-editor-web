@@ -10,8 +10,13 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateShareUrl } from '@/lib/config-url';
+import { saveFileToCache, loadFileFromCache, clearFileFromCache } from '@/lib/file-cache';
+
+function extractFilename(url: string): string {
+  return url.split('/').pop()?.split('?')[0] ?? 'audio.mp3';
+}
 
 export function ConfigPanel() {
   const { config, updateConfig } = useAppStore();
@@ -19,11 +24,97 @@ export function ConfigPanel() {
   const [endsceneFile, setEndsceneFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // IndexedDB / URL 復元関連
+  const [bgmFromCache, setBgmFromCache] = useState(false);
+  const [endsceneFromCache, setEndsceneFromCache] = useState(false);
+  const [cacheLoading, setCacheLoading] = useState(true);
+
+  // BGM URL 入力（保存済みURLを初期値として表示）
+  const [bgmUrl, setBgmUrl] = useState(config.bgm_url ?? '');
+  const [bgmUrlLoading, setBgmUrlLoading] = useState(false);
+  const [bgmUrlError, setBgmUrlError] = useState<string | null>(null);
+
+  // エンドシーン URL 入力（保存済みURLを初期値として表示）
+  const [endsceneUrl, setEndsceneUrl] = useState(config.endscene_url ?? '');
+  const [endsceneUrlLoading, setEndsceneUrlLoading] = useState(false);
+  const [endsceneUrlError, setEndsceneUrlError] = useState<string | null>(null);
+
+  // マウント時: URL方式 or IndexedDB から自動復元
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreFiles() {
+      try {
+        // BGM 復元: URL方式優先 → IndexedDB
+        if (config.bgm_url) {
+          try {
+            const res = await fetch(config.bgm_url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buffer = await res.arrayBuffer();
+            const filename = config.bgm_filename ?? extractFilename(config.bgm_url);
+            const file = new File([buffer], filename, {
+              type: res.headers.get('content-type') ?? 'audio/mpeg',
+            });
+            if (!cancelled) {
+              setBgmFile(file);
+              setBgmFromCache(true);
+              updateConfig({ bgm: file });
+            }
+          } catch {
+            if (!cancelled) setBgmUrlError('URLからの自動読み込みに失敗しました');
+          }
+        } else {
+          const cached = await loadFileFromCache('bgm');
+          if (!cancelled && cached) {
+            setBgmFile(cached);
+            setBgmFromCache(true);
+            updateConfig({ bgm: cached, bgm_filename: cached.name });
+          }
+        }
+
+        // エンドシーン 復元: URL方式優先 → IndexedDB
+        if (config.endscene_url) {
+          try {
+            const res = await fetch(config.endscene_url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buffer = await res.arrayBuffer();
+            const filename = config.endscene_filename ?? extractFilename(config.endscene_url);
+            const file = new File([buffer], filename, {
+              type: res.headers.get('content-type') ?? 'audio/mpeg',
+            });
+            if (!cancelled) {
+              setEndsceneFile(file);
+              setEndsceneFromCache(true);
+              updateConfig({ endscene: file });
+            }
+          } catch {
+            if (!cancelled) setEndsceneUrlError('URLからの自動読み込みに失敗しました');
+          }
+        } else {
+          const cached = await loadFileFromCache('endscene');
+          if (!cancelled && cached) {
+            setEndsceneFile(cached);
+            setEndsceneFromCache(true);
+            updateConfig({ endscene: cached, endscene_filename: cached.name });
+          }
+        }
+      } finally {
+        if (!cancelled) setCacheLoading(false);
+      }
+    }
+
+    restoreFiles();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ファイル選択ハンドラ
   const handleBgmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setBgmFile(file);
-      updateConfig({ bgm: file, bgm_filename: file.name });
+      setBgmFromCache(false);
+      updateConfig({ bgm: file, bgm_filename: file.name, bgm_url: undefined });
+      saveFileToCache('bgm', file); // IndexedDB に保存（put で上書き）
     }
   };
 
@@ -31,18 +122,75 @@ export function ConfigPanel() {
     const file = e.target.files?.[0];
     if (file) {
       setEndsceneFile(file);
-      updateConfig({ endscene: file, endscene_filename: file.name });
+      setEndsceneFromCache(false);
+      updateConfig({ endscene: file, endscene_filename: file.name, endscene_url: undefined });
+      saveFileToCache('endscene', file);
     }
   };
 
   const handleClearBgm = () => {
     setBgmFile(null);
-    updateConfig({ bgm: undefined, bgm_filename: undefined });
+    setBgmFromCache(false);
+    setBgmUrl('');
+    setBgmUrlError(null);
+    updateConfig({ bgm: undefined, bgm_filename: undefined, bgm_url: undefined });
+    clearFileFromCache('bgm');
   };
 
   const handleClearEndscene = () => {
     setEndsceneFile(null);
-    updateConfig({ endscene: undefined, endscene_filename: undefined });
+    setEndsceneFromCache(false);
+    setEndsceneUrl('');
+    setEndsceneUrlError(null);
+    updateConfig({ endscene: undefined, endscene_filename: undefined, endscene_url: undefined });
+    clearFileFromCache('endscene');
+  };
+
+  // URL 読み込みハンドラ
+  const handleBgmUrlLoad = async () => {
+    if (!bgmUrl) return;
+    setBgmUrlLoading(true);
+    setBgmUrlError(null);
+    try {
+      const res = await fetch(bgmUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buffer = await res.arrayBuffer();
+      const filename = extractFilename(bgmUrl);
+      const file = new File([buffer], filename, {
+        type: res.headers.get('content-type') ?? 'audio/mpeg',
+      });
+      setBgmFile(file);
+      setBgmFromCache(false);
+      updateConfig({ bgm: file, bgm_filename: filename, bgm_url: bgmUrl });
+      clearFileFromCache('bgm'); // URL方式が優先: IndexedDB のエントリを削除
+    } catch {
+      setBgmUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
+    } finally {
+      setBgmUrlLoading(false);
+    }
+  };
+
+  const handleEndsceneUrlLoad = async () => {
+    if (!endsceneUrl) return;
+    setEndsceneUrlLoading(true);
+    setEndsceneUrlError(null);
+    try {
+      const res = await fetch(endsceneUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buffer = await res.arrayBuffer();
+      const filename = extractFilename(endsceneUrl);
+      const file = new File([buffer], filename, {
+        type: res.headers.get('content-type') ?? 'audio/mpeg',
+      });
+      setEndsceneFile(file);
+      setEndsceneFromCache(false);
+      updateConfig({ endscene: file, endscene_filename: filename, endscene_url: endsceneUrl });
+      clearFileFromCache('endscene');
+    } catch {
+      setEndsceneUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
+    } finally {
+      setEndsceneUrlLoading(false);
+    }
   };
 
   const handleShareConfig = async () => {
@@ -295,11 +443,15 @@ export function ConfigPanel() {
               <p className="text-xs text-gray-500 mb-2">
                 自動ループ・フェード処理されます
               </p>
-              {!bgmFile && config.bgm_filename && (
+
+              {/* amber 警告: キャッシュ読み込み完了後のみ表示 */}
+              {!cacheLoading && !bgmFile && config.bgm_filename && (
                 <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
                   前回: {config.bgm_filename}（再選択が必要です）
                 </p>
               )}
+
+              {/* ファイル選択 */}
               <div className="flex items-center gap-2">
                 <input
                   id="bgm-file"
@@ -317,9 +469,35 @@ export function ConfigPanel() {
                   </button>
                 )}
               </div>
+
+              {/* URL 入力 */}
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="url"
+                  value={bgmUrl}
+                  onChange={(e) => setBgmUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleBgmUrlLoad()}
+                  placeholder="https://... (GitHub Raw, S3等)"
+                  className="flex-1 text-sm border rounded px-2 py-1"
+                />
+                <button
+                  onClick={handleBgmUrlLoad}
+                  disabled={bgmUrlLoading || !bgmUrl}
+                  className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                >
+                  {bgmUrlLoading ? '読込中...' : 'URLから読込'}
+                </button>
+              </div>
+              {bgmUrlError && (
+                <p className="text-xs text-red-600 mt-1">{bgmUrlError}</p>
+              )}
+
+              {/* ステータス */}
               {bgmFile && (
                 <p className="text-xs text-green-600 mt-1">
-                  ✓ 選択中: {bgmFile.name}
+                  ✓ {bgmFromCache
+                    ? `復元: ${bgmFile.name}${config.bgm_url ? ' (URL)' : ' (キャッシュ)'}`
+                    : `選択中: ${bgmFile.name}`}
                 </p>
               )}
             </div>
@@ -385,11 +563,15 @@ export function ConfigPanel() {
               <p className="text-xs text-gray-500 mb-2">
                 クロスフェードで接続されます
               </p>
-              {!endsceneFile && config.endscene_filename && (
+
+              {/* amber 警告 */}
+              {!cacheLoading && !endsceneFile && config.endscene_filename && (
                 <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
                   前回: {config.endscene_filename}（再選択が必要です）
                 </p>
               )}
+
+              {/* ファイル選択 */}
               <div className="flex items-center gap-2">
                 <input
                   id="endscene-file"
@@ -407,9 +589,35 @@ export function ConfigPanel() {
                   </button>
                 )}
               </div>
+
+              {/* URL 入力 */}
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="url"
+                  value={endsceneUrl}
+                  onChange={(e) => setEndsceneUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEndsceneUrlLoad()}
+                  placeholder="https://... (GitHub Raw, S3等)"
+                  className="flex-1 text-sm border rounded px-2 py-1"
+                />
+                <button
+                  onClick={handleEndsceneUrlLoad}
+                  disabled={endsceneUrlLoading || !endsceneUrl}
+                  className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                >
+                  {endsceneUrlLoading ? '読込中...' : 'URLから読込'}
+                </button>
+              </div>
+              {endsceneUrlError && (
+                <p className="text-xs text-red-600 mt-1">{endsceneUrlError}</p>
+              )}
+
+              {/* ステータス */}
               {endsceneFile && (
                 <p className="text-xs text-green-600 mt-1">
-                  ✓ 選択中: {endsceneFile.name}
+                  ✓ {endsceneFromCache
+                    ? `復元: ${endsceneFile.name}${config.endscene_url ? ' (URL)' : ' (キャッシュ)'}`
+                    : `選択中: ${endsceneFile.name}`}
                 </p>
               )}
             </div>

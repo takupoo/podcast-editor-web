@@ -167,7 +167,10 @@ export default function Home() {
         {/* 結果ダウンロード */}
         {result && (
           <div className="mb-8">
-            <ResultDownload blob={result} />
+            <ResultDownload
+              blob={result}
+              filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
+            />
           </div>
         )}
 
