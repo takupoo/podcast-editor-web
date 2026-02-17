@@ -23,8 +23,8 @@ export async function loadFFmpeg(
   }
 
   try {
-    // CDNからFFmpegコアをロード
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    // CDNからFFmpegコアをロード（0.12.10: concat フィルタの abort バグ修正含む）
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd';
 
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -57,4 +57,19 @@ export function getFFmpeg(): FFmpeg | null {
  */
 export function resetFFmpeg(): void {
   ffmpeg = null;
+}
+
+/**
+ * FFmpegインスタンスを強制再ロード
+ * WASM が Aborted() 状態になった後のリカバリー用
+ * @param onProgress ロード進捗コールバック
+ */
+export async function reloadFFmpeg(
+  onProgress?: (ratio: number) => void
+): Promise<FFmpeg> {
+  if (ffmpeg) {
+    try { ffmpeg.terminate(); } catch (_) {} // Worker を終了してリソースを解放
+  }
+  ffmpeg = null; // シングルトンを無効化して新規インスタンスを作成
+  return loadFFmpeg(onProgress);
 }

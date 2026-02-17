@@ -1,15 +1,18 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { execFF } from './exec';
+
+/**
+ * dB文字列を線形値に変換（acompressor/alimiterはlinear値が必要）
+ * 例: '-20dB' → 0.1, '-1dB' → 0.891
+ */
+function dbToLinear(dbStr: string): number {
+  // '-20dB' → -20, '-1dB' → -1, '-20' → -20
+  const db = parseFloat(dbStr.replace(/dB$/i, ''));
+  return Math.pow(10, db / 20);
+}
 
 /**
  * コンプレッサー + ハードリミッターを適用
- * @param ffmpeg FFmpegインスタンス
- * @param inputFile 入力ファイル名（FFmpegのFS内）
- * @param outputFile 出力ファイル名（FFmpegのFS内）
- * @param compThreshold コンプレッサー閾値 デフォルト: '-20dB'
- * @param compRatio 圧縮比 デフォルト: 4
- * @param compAttack アタック時間（ms）デフォルト: 5
- * @param compRelease リリース時間（ms）デフォルト: 50
- * @param limiterLimit リミッター上限 デフォルト: '-1dB'
  */
 export async function applyDynamics(
   ffmpeg: FFmpeg,
@@ -23,11 +26,16 @@ export async function applyDynamics(
 ): Promise<void> {
   console.log(`[Dynamics] 処理開始: ${inputFile}`);
 
-  // acompressor + alimiter フィルタチェーン
-  // acompressorのパラメータは:で連結、フィルタ間は,で区切る
-  const af = `acompressor=threshold=${compThreshold}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease},alimiter=limit=${limiterLimit}`;
+  // acompressor/alimiter はlinear値(0-1)が必要
+  // dB文字列の場合は変換する
+  const thresholdLinear = dbToLinear(compThreshold);
+  const limitLinear = dbToLinear(limiterLimit);
 
-  await ffmpeg.exec(['-y', '-i', inputFile, '-af', af, outputFile]);
+  console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}, limit=${limiterLimit}→${limitLinear.toFixed(4)}`);
+
+  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease},alimiter=limit=${limitLinear}`;
+
+  await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', af, outputFile], 'Dynamics');
 
   console.log(`[Dynamics] 処理完了: ${outputFile}`);
 }

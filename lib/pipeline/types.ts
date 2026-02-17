@@ -3,6 +3,10 @@
  */
 
 export interface ProcessConfig {
+  // Preview Mode
+  preview_mode: boolean;         // プレビューモード（最初のN秒のみ処理）
+  preview_duration: number;      // プレビュー時の処理時間（秒）
+
   // Stage 1: Trim
   pre_clap_margin: number;      // クラップ前の余白（秒）
   post_clap_cut: number;         // 0=クラップ残す, >0=クラップ後N秒からカット
@@ -10,7 +14,8 @@ export interface ProcessConfig {
 
   // Stage 2: Denoise
   denoise_enabled: boolean;
-  noise_gate_threshold: number;  // ノイズゲート閾値（dB）簡易版用
+  denoise_method: 'none' | 'afftdn' | 'anlmdn'; // ノイズ除去方式
+  noise_gate_threshold: number;  // ノイズフロア閾値（dB）
 
   // Stage 3: Loudness
   target_lufs: number;           // -16.0 LUFS（ポッドキャスト標準）
@@ -25,13 +30,15 @@ export interface ProcessConfig {
   limiter_limit: string;         // '-1dB'
 
   // Stage 5-6: Mix
-  bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト
+  bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト（非永続化）
+  bgm_filename?: string;         // BGMファイル名（永続化・共有URL用）
   bgm_volume_db: number;         // -30.0 dB
   bgm_fade_in: number;           // 3.0秒
   bgm_fade_out: number;          // 3.0秒
 
   // Stage 7: Endscene
-  endscene?: string | File;      // エンドシーンファイル
+  endscene?: string | File;      // エンドシーンファイル（非永続化）
+  endscene_filename?: string;    // エンドシーンファイル名（永続化・共有URL用）
   endscene_crossfade: number;    // 2.0秒
 
   // Stage 8: Export

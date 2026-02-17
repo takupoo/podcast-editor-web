@@ -1,50 +1,30 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { execFF } from './exec';
 
 /**
  * 音声ファイルの長さ（秒）を取得
+ * FFmpeg.wasmのFS内ファイルをWeb Audio APIでデコードして取得
+ * （FFmpeg execのログ解析は不安定なため採用しない）
  */
 async function getDuration(ffmpeg: FFmpeg, filePath: string): Promise<number> {
-  // ログを収集
-  let logMessages: string[] = [];
-  const logHandler = ({ message }: { message: string }) => {
-    logMessages.push(message);
-  };
-
-  ffmpeg.on('log', logHandler);
-
-  // FFmpegでファイル情報を取得
+  const data = await ffmpeg.readFile(filePath) as Uint8Array;
+  // Uint8ArrayのArrayBufferはオフセットを考慮してコピー（SharedArrayBuffer対策でスライス）
+  const arrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+  const audioContext = new AudioContext();
   try {
-    await ffmpeg.exec(['-i', filePath, '-f', 'null', '-']);
-  } catch (error) {
-    // -i で情報取得するとエラーが出るが、ログには情報が含まれている
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    return audioBuffer.duration;
+  } finally {
+    audioContext.close();
   }
-
-  ffmpeg.off('log', logHandler);
-
-  // ログからDurationを抽出（例: Duration: 00:01:23.45）
-  const logText = logMessages.join('\n');
-  const durationMatch = logText.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
-
-  if (!durationMatch) {
-    console.error('ログ内容:', logText);
-    throw new Error(`ファイルの長さを取得できませんでした: ${filePath}`);
-  }
-
-  const hours = parseInt(durationMatch[1], 10);
-  const minutes = parseInt(durationMatch[2], 10);
-  const seconds = parseFloat(durationMatch[3]);
-
-  const duration = hours * 3600 + minutes * 60 + seconds;
-
-  return duration;
 }
 
 /**
- * 2トラックをセンターにミックス（両耳から両方聞こえる）
+ * 2トラックをミックス（モノラル入力に対応）
  * @param ffmpeg FFmpegインスタンス
- * @param trackA トラックA（FFmpegのFS内）
- * @param trackB トラックB（FFmpegのFS内）
- * @param output 出力ファイル（FFmpegのFS内）
+ * @param trackA トラックA（FFmpegのFS内、monoを想定）
+ * @param trackB トラックB（FFmpegのFS内、monoを想定）
+ * @param output 出力ファイル（FFmpegのFS内、monoで出力）
  */
 export async function mixVoices(
   ffmpeg: FFmpeg,
@@ -54,24 +34,18 @@ export async function mixVoices(
 ): Promise<void> {
   console.log(`[Mix] ボイスミックス開始: ${trackA} + ${trackB}`);
 
-  const filterComplex = [
-    '[0:a]pan=mono|c0=0.5*FL+0.5*FR[a]',
-    '[1:a]pan=mono|c0=0.5*FL+0.5*FR[b]',
-    '[a][b]amix=inputs=2:duration=first:normalize=0[out]',
-  ].join(';');
-
-  await ffmpeg.exec([
+  // モノラル入力をそのままamixでミックス
+  // normalize=0: 音量を保持（Loudness/Dynamicsで既に調整済み）
+  await execFF(ffmpeg, [
     '-y',
     '-i',
     trackA,
     '-i',
     trackB,
     '-filter_complex',
-    filterComplex,
-    '-map',
-    '[out]',
+    '[0:a][1:a]amix=inputs=2:duration=first:normalize=0',
     output,
-  ]);
+  ], 'Mix:voices');
 
   console.log(`[Mix] ボイスミックス完了: ${output}`);
 }
@@ -102,32 +76,26 @@ export async function addBGM(
 
   const fadeOutStart = Math.max(0, voiceDuration - bgmFadeOut);
 
-  // BGMが本編より短い場合のみループ
-  let bgmSrc: string;
-  if (bgmDuration < voiceDuration) {
-    bgmSrc = `[1:a]aloop=loop=-1:size=2e+09,atrim=0:${voiceDuration}`;
-  } else {
-    bgmSrc = `[1:a]atrim=0:${voiceDuration}`;
-  }
+  // BGMが本編より短い場合: -stream_loop -1 で入力レベルでループ
+  // （aloop=size=2e+09 はWASMメモリ不足の原因になるため使用しない）
+  const needsLoop = bgmDuration < voiceDuration;
 
   const bgmFilter = [
-    bgmSrc,
+    `[1:a]atrim=0:${voiceDuration}`,
     `volume=${bgmVolumeDb}dB`,
     `afade=t=in:d=${bgmFadeIn}`,
     `afade=t=out:st=${fadeOutStart}:d=${bgmFadeOut}[bgm]`,
     '[0:a][bgm]amix=inputs=2:duration=first:normalize=0',
   ].join(',');
 
-  await ffmpeg.exec([
+  await execFF(ffmpeg, [
     '-y',
-    '-i',
-    voicePath,
-    '-i',
-    bgmPath,
-    '-filter_complex',
-    bgmFilter,
+    '-i', voicePath,
+    ...(needsLoop ? ['-stream_loop', '-1'] : []),
+    '-i', bgmPath,
+    '-filter_complex', bgmFilter,
     output,
-  ]);
+  ], 'Mix:bgm');
 
   console.log(
     `[Mix] BGM追加完了: ${output} (vol=${bgmVolumeDb}dB, loop=${
@@ -161,7 +129,7 @@ export async function appendEndscene(
     '[main][end]concat=n=2:v=0:a=1',
   ].join(';');
 
-  await ffmpeg.exec([
+  await execFF(ffmpeg, [
     '-y',
     '-i',
     mainPath,
@@ -170,7 +138,7 @@ export async function appendEndscene(
     '-filter_complex',
     filterComplex,
     output,
-  ]);
+  ], 'Mix:endscene');
 
   console.log(
     `[Mix] エンドシーン追加完了: ${output} (crossfade=${crossfadeSec}s)`
@@ -192,7 +160,7 @@ export async function exportMP3(
 ): Promise<void> {
   console.log(`[Export] MP3エンコード開始: ${inputPath}`);
 
-  await ffmpeg.exec([
+  await execFF(ffmpeg, [
     '-y',
     '-i',
     inputPath,
@@ -201,7 +169,7 @@ export async function exportMP3(
     '-b:a',
     bitrate,
     outputPath,
-  ]);
+  ], 'Export:mp3');
 
   console.log(`[Export] MP3エンコード完了: ${outputPath} (${bitrate})`);
 }

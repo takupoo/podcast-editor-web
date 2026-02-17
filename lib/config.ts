@@ -1,14 +1,19 @@
 import { ProcessConfig } from './pipeline/types';
 
 export const DEFAULT_CONFIG: ProcessConfig = {
+  // Preview Mode
+  preview_mode: false, // プレビューモードOFF（全体を処理）
+  preview_duration: 30, // プレビュー時は最初の30秒
+
   // Stage 1: Trim
   pre_clap_margin: 0.5,
   post_clap_cut: 1.0,  // クラップの1秒後からカット（クラップ音を除去）
   clap_threshold_db: -10.0,
 
   // Stage 2: Denoise
-  denoise_enabled: false, // デフォルトOFF（ハイ/ローパスフィルタのみ、ノイズゲートなし）
-  noise_gate_threshold: -50.0,
+  denoise_enabled: true,  // デフォルトON
+  denoise_method: 'afftdn', // デフォルト: afftdn（軽量）
+  noise_gate_threshold: -50.0, // ノイズフロア閾値（-60～-30dB）
 
   // Stage 3: Loudness
   target_lufs: -16.0,

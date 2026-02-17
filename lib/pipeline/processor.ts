@@ -1,12 +1,25 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { ProcessConfig, ProcessProgress } from './types';
-import { loadFFmpeg } from '../ffmpeg-worker';
+import { loadFFmpeg, reloadFFmpeg } from '../ffmpeg-worker';
 import { applySyncAndTrim } from './trim';
 import { applyDenoise } from './denoise';
 import { normalizeLoudness } from './loudness';
 import { applyDynamics } from './dynamics';
 import { mixVoices, addBGM, appendEndscene, exportMP3 } from './mix';
+import { execFF } from './exec';
+
+/**
+ * FFmpegのFS内ファイルを安全に削除（WASMメモリ節約用）
+ * 存在しない場合や削除失敗は無視する
+ */
+async function safeDelete(ffmpeg: FFmpeg, name: string): Promise<void> {
+  try {
+    await ffmpeg.deleteFile(name);
+  } catch (_) {
+    // 存在しない / 削除不可の場合は無視
+  }
+}
 
 /**
  * ポッドキャスト処理パイプライン（完全版）
@@ -26,7 +39,7 @@ export async function processPodcast(
     // FFmpegロード
     console.log('[Processor] FFmpegロード開始');
     onProgress({ stage: 'loading', percent: 0, message: 'FFmpegを読み込み中...' });
-    const ffmpeg = await loadFFmpeg((ratio) => {
+    let ffmpeg = await loadFFmpeg((ratio) => {
       onProgress({
         stage: 'loading',
         percent: ratio * 10,
@@ -34,6 +47,17 @@ export async function processPodcast(
       });
     });
     console.log('[Processor] FFmpegロード完了');
+
+    // Aborted() を検出するグローバルウォッチャー
+    // appendEndscene などの concat フィルタが WASM cleanup で abort() を呼ぶ場合がある
+    let wasmAborted = false;
+    const abortWatcher = ({ message }: { message: string }) => {
+      if (message.includes('Aborted()')) {
+        wasmAborted = true;
+        console.warn('[Processor] WASM Aborted() を検出');
+      }
+    };
+    ffmpeg.on('log', abortWatcher);
 
     // ファイルをFFmpegのFSに書き込み
     console.log('[Processor] ファイル書き込み開始');
@@ -54,7 +78,10 @@ export async function processPodcast(
       throw new Error(`ファイルの書き込みに失敗しました: ${error}`);
     }
 
-    // Stage 1: Trim（クラップ検出・同期）
+    let currentFileA: string;
+    let currentFileB: string;
+
+    // Stage 1: クラップ検出 + 同期トリム（プレビュー・通常モード共通）
     onProgress({
       stage: 'trim',
       percent: 10,
@@ -63,8 +90,6 @@ export async function processPodcast(
 
     await applySyncAndTrim(
       ffmpeg,
-      fileA,
-      fileB,
       'trimmed_a.wav',
       'trimmed_b.wav',
       config.pre_clap_margin,
@@ -72,40 +97,81 @@ export async function processPodcast(
       config.clap_threshold_db
     );
 
-    let currentFileA = 'trimmed_a.wav';
-    let currentFileB = 'trimmed_b.wav';
+    currentFileA = 'trimmed_a.wav';
+    currentFileB = 'trimmed_b.wav';
+
+    // プレビューモード: 同期済みトラックをさらにN秒に切り出す
+    if (config.preview_mode && config.preview_duration) {
+      console.log(`[Processor] プレビューモード: 同期後、最初の${config.preview_duration}秒を切り出し`);
+      onProgress({
+        stage: 'trim',
+        percent: 15,
+        message: `プレビュー用に最初の${config.preview_duration}秒を切り出し中...`,
+      });
+
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFileA,
+        '-t', config.preview_duration.toString(),
+        'preview_a.wav',
+      ], 'Trim:preview:A');
+      await safeDelete(ffmpeg, currentFileA);
+
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFileB,
+        '-t', config.preview_duration.toString(),
+        'preview_b.wav',
+      ], 'Trim:preview:B');
+      await safeDelete(ffmpeg, currentFileB);
+
+      currentFileA = 'preview_a.wav';
+      currentFileB = 'preview_b.wav';
+    }
+
+    // 入力ファイルを削除してWASMメモリを解放
+    await safeDelete(ffmpeg, 'input_a.mp3');
+    await safeDelete(ffmpeg, 'input_b.mp3');
 
     // Stage 2: Denoise（ノイズ除去）
     if (config.denoise_enabled) {
       onProgress({
         stage: 'denoise',
-        percent: 15,
-        message: 'ノイズを除去中...',
+        percent: 20,
+        message: `ノイズを除去中（${config.denoise_method}）...`,
       });
 
+      const prevA = currentFileA, prevB = currentFileB;
       await applyDenoise(
         ffmpeg,
         currentFileA,
         'denoised_a.wav',
+        config.denoise_method,
         config.noise_gate_threshold
       );
+      await safeDelete(ffmpeg, prevA);
 
       await applyDenoise(
         ffmpeg,
         currentFileB,
         'denoised_b.wav',
+        config.denoise_method,
         config.noise_gate_threshold
       );
+      await safeDelete(ffmpeg, prevB);
 
       currentFileA = 'denoised_a.wav';
       currentFileB = 'denoised_b.wav';
     }
 
     // Stage 3: Loudness正規化
+    // プレビューモード: 単パス（高速・精度低） / 通常モード: 2パス（高精度）
+    const loudnessSinglePass = config.preview_mode === true;
+
     onProgress({
       stage: 'loudness',
-      percent: 25,
-      message: 'ラウドネスを正規化中（話者A）...',
+      percent: 30,
+      message: loudnessSinglePass
+        ? 'ラウドネスを調整中（高速モード）...'
+        : 'ラウドネスを計測中（話者A）...',
     });
     await normalizeLoudness(
       ffmpeg,
@@ -113,13 +179,17 @@ export async function processPodcast(
       'loud_a.wav',
       config.target_lufs,
       config.true_peak,
-      config.lra
+      config.lra,
+      loudnessSinglePass
     );
+    await safeDelete(ffmpeg, currentFileA);
 
     onProgress({
       stage: 'loudness',
-      percent: 35,
-      message: 'ラウドネスを正規化中（話者B）...',
+      percent: 40,
+      message: loudnessSinglePass
+        ? 'ラウドネスを調整中（高速モード）...'
+        : 'ラウドネスを計測中（話者B）...',
     });
     await normalizeLoudness(
       ffmpeg,
@@ -127,13 +197,15 @@ export async function processPodcast(
       'loud_b.wav',
       config.target_lufs,
       config.true_peak,
-      config.lra
+      config.lra,
+      loudnessSinglePass
     );
+    await safeDelete(ffmpeg, currentFileB);
 
     // Stage 4: Dynamics処理
     onProgress({
       stage: 'dynamics',
-      percent: 40,
+      percent: 50,
       message: 'ダイナミクスを処理中（話者A）...',
     });
     await applyDynamics(
@@ -146,10 +218,11 @@ export async function processPodcast(
       config.comp_release,
       config.limiter_limit
     );
+    await safeDelete(ffmpeg, 'loud_a.wav');
 
     onProgress({
       stage: 'dynamics',
-      percent: 50,
+      percent: 60,
       message: 'ダイナミクスを処理中（話者B）...',
     });
     await applyDynamics(
@@ -162,14 +235,17 @@ export async function processPodcast(
       config.comp_release,
       config.limiter_limit
     );
+    await safeDelete(ffmpeg, 'loud_b.wav');
 
     // Stage 5: ボイスミックス
     onProgress({
       stage: 'mix',
-      percent: 60,
+      percent: 70,
       message: '2トラックをミックス中...',
     });
     await mixVoices(ffmpeg, 'processed_a.wav', 'processed_b.wav', 'mixed.wav');
+    await safeDelete(ffmpeg, 'processed_a.wav');
+    await safeDelete(ffmpeg, 'processed_b.wav');
 
     let currentFile = 'mixed.wav';
 
@@ -177,11 +253,10 @@ export async function processPodcast(
     if (config.bgm) {
       onProgress({
         stage: 'bgm',
-        percent: 70,
+        percent: 78,
         message: 'BGMを追加中...',
       });
 
-      // BGMファイルをFFmpegのFSに書き込み
       if (config.bgm instanceof File) {
         const bgmData = await fetchFile(config.bgm);
         console.log('[Processor] BGMファイル読み込み完了:', bgmData.byteLength, 'bytes');
@@ -191,6 +266,7 @@ export async function processPodcast(
         throw new Error('BGMファイルが不正です');
       }
 
+      const prevMixed = currentFile;
       await addBGM(
         ffmpeg,
         currentFile,
@@ -200,6 +276,8 @@ export async function processPodcast(
         config.bgm_fade_in,
         config.bgm_fade_out
       );
+      await safeDelete(ffmpeg, prevMixed);
+      await safeDelete(ffmpeg, 'bgm.mp3');
       currentFile = 'with_bgm.wav';
     }
 
@@ -207,11 +285,10 @@ export async function processPodcast(
     if (config.endscene) {
       onProgress({
         stage: 'endscene',
-        percent: 80,
+        percent: 85,
         message: 'エンドシーンを追加中...',
       });
 
-      // エンドシーンファイルをFFmpegのFSに書き込み
       if (config.endscene instanceof File) {
         const endsceneData = await fetchFile(config.endscene);
         console.log('[Processor] エンドシーンファイル読み込み完了:', endsceneData.byteLength, 'bytes');
@@ -221,6 +298,7 @@ export async function processPodcast(
         throw new Error('エンドシーンファイルが不正です');
       }
 
+      const prevFile = currentFile;
       await appendEndscene(
         ffmpeg,
         currentFile,
@@ -228,7 +306,29 @@ export async function processPodcast(
         'with_endscene.wav',
         config.endscene_crossfade
       );
+      await safeDelete(ffmpeg, prevFile);
+      await safeDelete(ffmpeg, 'endscene.mp3');
       currentFile = 'with_endscene.wav';
+    }
+
+    // Aborted() が発生していた場合: 出力ファイルを保存してFFmpegを再ロード
+    // appendEndscene の concat フィルタが WASM abort を引き起こすことがある
+    // その場合、次の exec() が RuntimeError になるため事前にリロードが必要
+    if (wasmAborted) {
+      console.warn('[Processor] Aborted() 後のリカバリー: FFmpegを再ロード中...');
+      onProgress({
+        stage: 'export',
+        percent: 88,
+        message: 'FFmpegを再初期化中...',
+      });
+      const savedFile = await ffmpeg.readFile(currentFile) as Uint8Array;
+      ffmpeg.off('log', abortWatcher);
+      ffmpeg = await reloadFFmpeg();
+      // 再ロード後のログにもウォッチャーを設定
+      ffmpeg.on('log', abortWatcher);
+      await ffmpeg.writeFile(currentFile, savedFile);
+      wasmAborted = false;
+      console.log('[Processor] FFmpeg再ロード完了、処理を継続');
     }
 
     // Stage 8: MP3エンコード
@@ -244,9 +344,9 @@ export async function processPodcast(
     if (config.output_format === 'mp3') {
       await exportMP3(ffmpeg, currentFile, outputFile, config.mp3_bitrate);
     } else {
-      // WAV出力の場合はそのままコピー
-      await ffmpeg.exec(['-y', '-i', currentFile, outputFile]);
+      await execFF(ffmpeg, ['-y', '-i', currentFile, outputFile], 'Export:wav');
     }
+    await safeDelete(ffmpeg, currentFile);
 
     // 結果を読み込み
     onProgress({

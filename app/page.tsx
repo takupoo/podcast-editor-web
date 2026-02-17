@@ -1,20 +1,31 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { FileUploader } from '@/components/FileUploader';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
-import { ConfigPanel } from '@/components/ConfigPanel';
 import { useAppStore } from '@/lib/store';
+
+// SSR時にlocalStorageからの初期値とサーバー側のデフォルト値が異なるため
+// Hydrationエラーを防ぐためSSRを無効化
+const ConfigPanel = dynamic(
+  () => import('@/components/ConfigPanel').then((m) => ({ default: m.ConfigPanel })),
+  { ssr: false }
+);
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 
 export default function Home() {
   const { config, fileA, fileB, setFileA, setFileB } = useAppStore();
+  const [mounted, setMounted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<ProcessProgress | null>(null);
   const [result, setResult] = useState<Blob | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // マウント後にのみZustandのpersistedな値を使う（Hydration対策）
+  useEffect(() => setMounted(true), []);
 
   // 通知許可をリクエスト
   useEffect(() => {
@@ -123,7 +134,11 @@ export default function Home() {
               }
             `}
           >
-            {processing ? '処理中...' : '処理開始'}
+            {processing
+              ? '処理中...'
+              : (mounted && config.preview_mode)
+                ? `プレビュー処理（最初の${config.preview_duration}秒）`
+                : '処理開始'}
           </button>
           {!fileA || !fileB ? (
             <p className="text-sm text-gray-500 mt-2">
@@ -161,7 +176,7 @@ export default function Home() {
           <h2 className="text-lg font-semibold mb-3">処理内容</h2>
           <ul className="text-sm text-gray-600 space-y-1">
             <li>✓ クラップ検出・同期（録音開始時の手拍子で2トラックを自動同期）</li>
-            <li>✓ ノイズ除去（ノイズゲート + ハイ/ローパスフィルタ）</li>
+            <li>✓ ノイズ除去（FFT/NLMeansベース、ホワイトノイズに効果的）</li>
             <li>✓ ラウドネス正規化（-16 LUFS）</li>
             <li>✓ ダイナミクス処理（コンプレッサー + リミッター）</li>
             <li>✓ ステレオミックス</li>
@@ -170,7 +185,7 @@ export default function Home() {
             <li>✓ MP3/WAVエンコード（ビットレート調整可能）</li>
           </ul>
           <p className="text-xs text-gray-500 mt-4">
-            Week 3版: 詳細設定UI実装完了。全パラメータ調整可能
+            Week 3版: FFT/NLMeansノイズ除去実装。全パラメータ調整可能
           </p>
         </div>
       </div>

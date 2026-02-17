@@ -23,7 +23,7 @@ export function ConfigPanel() {
     const file = e.target.files?.[0];
     if (file) {
       setBgmFile(file);
-      updateConfig({ bgm: file });
+      updateConfig({ bgm: file, bgm_filename: file.name });
     }
   };
 
@@ -31,18 +31,18 @@ export function ConfigPanel() {
     const file = e.target.files?.[0];
     if (file) {
       setEndsceneFile(file);
-      updateConfig({ endscene: file });
+      updateConfig({ endscene: file, endscene_filename: file.name });
     }
   };
 
   const handleClearBgm = () => {
     setBgmFile(null);
-    updateConfig({ bgm: undefined });
+    updateConfig({ bgm: undefined, bgm_filename: undefined });
   };
 
   const handleClearEndscene = () => {
     setEndsceneFile(null);
-    updateConfig({ endscene: undefined });
+    updateConfig({ endscene: undefined, endscene_filename: undefined });
   };
 
   const handleShareConfig = async () => {
@@ -69,7 +69,55 @@ export function ConfigPanel() {
         </button>
       </div>
 
-      <Accordion type="multiple" defaultValue={['trim']} className="w-full">
+      <Accordion type="multiple" defaultValue={['preview', 'trim']} className="w-full">
+        {/* プレビューモード */}
+        <AccordionItem value="preview">
+          <AccordionTrigger>🚀 プレビューモード（音質比較用）</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="preview-mode">プレビューモード</Label>
+                <p className="text-xs text-gray-500">
+                  最初の{config.preview_duration}秒だけを高速処理して音質を比較
+                </p>
+              </div>
+              <Switch
+                id="preview-mode"
+                checked={config.preview_mode}
+                onCheckedChange={(checked) =>
+                  updateConfig({ preview_mode: checked })
+                }
+              />
+            </div>
+
+            {config.preview_mode && (
+              <div>
+                <Label htmlFor="preview-duration">
+                  プレビュー時間: {config.preview_duration}秒
+                </Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  処理する長さ（10-60秒、推奨: 30秒）
+                </p>
+                <Slider
+                  id="preview-duration"
+                  min={10}
+                  max={60}
+                  step={5}
+                  value={[config.preview_duration]}
+                  onValueChange={([value]) =>
+                    updateConfig({ preview_duration: value })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
+              💡 <strong>プレビューモード</strong>を使うと、異なるノイズ除去方式を素早く比較できます。
+              <br />各設定で処理を実行→ダウンロード→ローカル版と聴き比べ
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
         {/* 基本設定 */}
         <AccordionItem value="trim">
           <AccordionTrigger>基本設定（トリム）</AccordionTrigger>
@@ -122,7 +170,7 @@ export function ConfigPanel() {
               <div>
                 <Label htmlFor="denoise-enabled">ノイズ除去</Label>
                 <p className="text-xs text-gray-500">
-                  ノイズゲート + ハイ/ローパスフィルタ
+                  ホワイトノイズ・背景ノイズを除去
                 </p>
               </div>
               <Switch
@@ -135,24 +183,64 @@ export function ConfigPanel() {
             </div>
 
             {config.denoise_enabled && (
-              <div>
-                <Label htmlFor="noise-gate-threshold">
-                  ノイズゲート閾値: {config.noise_gate_threshold}dB
-                </Label>
-                <p className="text-xs text-gray-500 mb-2">
-                  低いほど弱いノイズも除去（推奨: -40dB）
-                </p>
-                <Slider
-                  id="noise-gate-threshold"
-                  min={-60}
-                  max={-20}
-                  step={5}
-                  value={[config.noise_gate_threshold]}
-                  onValueChange={([value]) =>
-                    updateConfig({ noise_gate_threshold: value })
-                  }
-                />
-              </div>
+              <>
+                <div>
+                  <Label>ノイズ除去方式</Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    音質を比較して最適な方式を選択してください
+                  </p>
+                  <div className="space-y-2">
+                    {(['none', 'afftdn', 'anlmdn'] as const).map((method) => (
+                      <label
+                        key={method}
+                        className="flex items-start gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="radio"
+                          name="denoise_method"
+                          value={method}
+                          checked={config.denoise_method === method}
+                          onChange={() => updateConfig({ denoise_method: method })}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">
+                            {method === 'none' && 'なし（フィルタのみ）'}
+                            {method === 'afftdn' && 'afftdn（FFTベース）'}
+                            {method === 'anlmdn' && 'anlmdn（NLMeans）'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {method === 'none' && 'highpass + lowpassのみ。ノイズ除去なし。'}
+                            {method === 'afftdn' && '軽量・高速。定常ノイズに効果的。推奨。'}
+                            {method === 'anlmdn' && '高品質・重い。非定常ノイズにも対応。'}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {config.denoise_method !== 'none' && (
+                  <div>
+                    <Label htmlFor="noise-gate-threshold">
+                      ノイズフロア閾値: {config.noise_gate_threshold}dB
+                    </Label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      低いほど弱いノイズも除去（推奨: -50dB）
+                    </p>
+                    <Slider
+                      id="noise-gate-threshold"
+                      min={-60}
+                      max={-30}
+                      step={5}
+                      value={[config.noise_gate_threshold]}
+                      onValueChange={([value]) =>
+                        updateConfig({ noise_gate_threshold: value })
+                      }
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             <div>
@@ -205,6 +293,11 @@ export function ConfigPanel() {
               <p className="text-xs text-gray-500 mb-2">
                 自動ループ・フェード処理されます
               </p>
+              {!bgmFile && config.bgm_filename && (
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
+                  前回: {config.bgm_filename}（再選択が必要です）
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   id="bgm-file"
@@ -213,7 +306,7 @@ export function ConfigPanel() {
                   onChange={handleBgmChange}
                   className="text-sm"
                 />
-                {bgmFile && (
+                {(bgmFile || config.bgm_filename) && (
                   <button
                     onClick={handleClearBgm}
                     className="text-xs text-red-600 hover:underline"
@@ -223,8 +316,8 @@ export function ConfigPanel() {
                 )}
               </div>
               {bgmFile && (
-                <p className="text-xs text-gray-600 mt-1">
-                  選択中: {bgmFile.name}
+                <p className="text-xs text-green-600 mt-1">
+                  ✓ 選択中: {bgmFile.name}
                 </p>
               )}
             </div>
@@ -290,6 +383,11 @@ export function ConfigPanel() {
               <p className="text-xs text-gray-500 mb-2">
                 クロスフェードで接続されます
               </p>
+              {!endsceneFile && config.endscene_filename && (
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
+                  前回: {config.endscene_filename}（再選択が必要です）
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   id="endscene-file"
@@ -298,7 +396,7 @@ export function ConfigPanel() {
                   onChange={handleEndsceneChange}
                   className="text-sm"
                 />
-                {endsceneFile && (
+                {(endsceneFile || config.endscene_filename) && (
                   <button
                     onClick={handleClearEndscene}
                     className="text-xs text-red-600 hover:underline"
@@ -308,8 +406,8 @@ export function ConfigPanel() {
                 )}
               </div>
               {endsceneFile && (
-                <p className="text-xs text-gray-600 mt-1">
-                  選択中: {endsceneFile.name}
+                <p className="text-xs text-green-600 mt-1">
+                  ✓ 選択中: {endsceneFile.name}
                 </p>
               )}
             </div>

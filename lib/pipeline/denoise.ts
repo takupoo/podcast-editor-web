@@ -1,41 +1,102 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { execFF } from './exec';
 
 /**
- * ノイズ除去（ノイズゲート + ハイパスフィルタ）
- *
- * Python版のnoisereduce（スペクトラルゲーティング）の代替として、
- * より安全なノイズゲート + ハイパスフィルタの組み合わせを使用
- *
- * アプローチ:
- * 1. ハイパスフィルタ（80Hz以下をカット）→ 低周波ノイズを除去
- * 2. ノイズゲート（閾値以下の音をカット）→ 無音時のノイズを除去
- * 3. ローパスフィルタ（12kHz以上をカット）→ 高周波ノイズを除去
+ * ノイズ除去（複数方式対応）
  *
  * @param ffmpeg FFmpegインスタンス
  * @param inputFile 入力ファイル名（FFmpegのFS内）
  * @param outputFile 出力ファイル名（FFmpegのFS内）
- * @param threshold ノイズゲート閾値（dB）デフォルト: -40.0
+ * @param method ノイズ除去方式（'none' | 'afftdn' | 'anlmdn'）
+ * @param threshold ノイズ除去強度（dB）-60～-30（推奨: -50）
  */
 export async function applyDenoise(
   ffmpeg: FFmpeg,
   inputFile: string,
   outputFile: string,
-  threshold: number = -40.0
+  method: 'none' | 'afftdn' | 'anlmdn' = 'afftdn',
+  threshold: number = -50.0
 ): Promise<void> {
   console.log(`[Denoise] ノイズ除去開始: ${inputFile}`);
+  console.log(`[Denoise] 方式: ${method}, 閾値: ${threshold}dB`);
 
-  // ノイズ除去フィルタチェーン（agateは音声を消すため除外）
-  // 1. highpass=f=80 → 80Hz以下の低周波ノイズ（エアコン、機械音など）を除去
-  // 2. lowpass=f=12000 → 12kHz以上の高周波ノイズ（ヒスノイズなど）を除去
-  //
-  // 注: Python版のnoisereduce（スペクトラルゲーティング）と同等の機能は
-  //     FFmpeg.wasmでは利用できないため、基本的なフィルタリングのみ実装
-  const af = [
-    'highpass=f=80',
-    'lowpass=f=12000',
-  ].join(',');
+  if (method === 'none') {
+    // 方式1: ノイズ除去なし（ハイ/ローパスフィルタのみ）
+    console.log('[Denoise] 方式: none（ハイ/ローパスフィルタのみ）');
 
-  await ffmpeg.exec(['-y', '-i', inputFile, '-af', af, outputFile]);
+    const basicFilter = [
+      'highpass=f=80',
+      'lowpass=f=12000',
+    ].join(',');
 
-  console.log(`[Denoise] ノイズ除去完了: ${outputFile}`);
+    await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
+    console.log('[Denoise] 基本フィルタによる処理完了');
+    return;
+  }
+
+  if (method === 'afftdn') {
+    // 方式2: afftdn（FFTベースのノイズ除去）
+    // ホワイトノイズや定常的な背景ノイズに効果的
+    console.log('[Denoise] 方式: afftdn（FFTベース）');
+
+    // 閾値を適切なノイズ除去量（nr）に変換
+    // -60dB → 弱い除去（nr=3）
+    // -50dB → 標準除去（nr=6）
+    // -40dB → 強い除去（nr=9）
+    // -30dB → 最強除去（nr=12）
+    const noiseReduction = Math.max(3, Math.min(12, ((-threshold - 30) / 10) * 3));
+    console.log(`[Denoise] ノイズ除去量: ${noiseReduction}dB`);
+
+    const afftdnFilter = [
+      'highpass=f=80',
+      `afftdn=nr=${noiseReduction}:nf=-50:tn=0`,
+      'lowpass=f=12000',
+    ].join(',');
+
+    console.log(`[Denoise] フィルタ: ${afftdnFilter}`);
+
+    try {
+      await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', afftdnFilter, outputFile], 'Denoise:afftdn');
+      console.log('[Denoise] afftdnによるノイズ除去成功');
+      return;
+    } catch (error) {
+      console.warn('[Denoise] afftdn失敗、フォールバック:', error);
+      // フォールバック: 基本フィルタのみ
+      const basicFilter = ['highpass=f=80', 'lowpass=f=12000'].join(',');
+      await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
+      console.log('[Denoise] フォールバックで処理完了');
+      return;
+    }
+  }
+
+  if (method === 'anlmdn') {
+    // 方式3: anlmdn（Non-Local Meansベース）
+    // afftdnより高品質だが処理が重い
+    console.log('[Denoise] 方式: anlmdn（NLMeansベース）');
+
+    // 閾値を適切な強度（s）に変換（1-15の範囲）
+    const strength = Math.max(1, Math.min(15, ((-threshold - 30) / 10) * 5));
+    console.log(`[Denoise] NLMeans強度: ${strength}`);
+
+    const anlmdnFilter = [
+      'highpass=f=80',
+      `anlmdn=s=${strength}:p=7:r=15`,
+      'lowpass=f=12000',
+    ].join(',');
+
+    console.log(`[Denoise] フィルタ: ${anlmdnFilter}`);
+
+    try {
+      await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', anlmdnFilter, outputFile], 'Denoise:anlmdn');
+      console.log('[Denoise] anlmdnによるノイズ除去成功');
+      return;
+    } catch (error) {
+      console.warn('[Denoise] anlmdn失敗、フォールバック:', error);
+      // フォールバック: 基本フィルタのみ
+      const basicFilter = ['highpass=f=80', 'lowpass=f=12000'].join(',');
+      await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
+      console.log('[Denoise] フォールバックで処理完了');
+      return;
+    }
+  }
 }

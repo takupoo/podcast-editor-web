@@ -64,6 +64,18 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         config: state.config,
       }),
+      // localStorageから読み込んだ設定をデフォルト値とマージ
+      merge: (persistedState, currentState) => {
+        const ps = persistedState as Partial<AppState>;
+        const merged: AppState = {
+          ...currentState,
+          config: {
+            ...DEFAULT_CONFIG, // デフォルト値を先に展開
+            ...(ps?.config ?? {}), // 保存された値で上書き
+          },
+        };
+        return merged;
+      },
     }
   )
 );
