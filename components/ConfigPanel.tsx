@@ -190,7 +190,7 @@ export function ConfigPanel() {
                     音質を比較して最適な方式を選択してください
                   </p>
                   <div className="space-y-2">
-                    {(['none', 'afftdn', 'anlmdn'] as const).map((method) => (
+                    {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map((method) => (
                       <label
                         key={method}
                         className="flex items-start gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer"
@@ -205,14 +205,16 @@ export function ConfigPanel() {
                         />
                         <div className="flex-1">
                           <div className="text-sm font-medium">
-                            {method === 'none' && 'なし（フィルタのみ）'}
+                            {method === 'spectral' && 'スペクトル減算（推奨）'}
                             {method === 'afftdn' && 'afftdn（FFTベース）'}
                             {method === 'anlmdn' && 'anlmdn（NLMeans）'}
+                            {method === 'none' && 'なし（フィルタのみ）'}
                           </div>
                           <div className="text-xs text-gray-500">
+                            {method === 'spectral' && 'Python版noisereduce相当。録音内の静かなフレームからノイズを学習して除去。サー音・キーン音・ファン音に最も効果的。'}
+                            {method === 'afftdn' && 'FFTベース。時間的ノイズ追跡あり。軽量で定常ノイズに効果的。'}
+                            {method === 'anlmdn' && '非局所平均ベース。高品質だが処理が重い。'}
                             {method === 'none' && 'highpass + lowpassのみ。ノイズ除去なし。'}
-                            {method === 'afftdn' && '軽量・高速。定常ノイズに効果的。推奨。'}
-                            {method === 'anlmdn' && '高品質・重い。非定常ノイズにも対応。'}
                           </div>
                         </div>
                       </label>
