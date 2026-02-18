@@ -276,7 +276,7 @@ export async function processPodcast(
         currentFile,
         'bgm.mp3',
         'with_bgm.wav',
-        config.bgm_volume_db,
+        config.bgm_target_lufs,
         config.bgm_fade_in,
         config.bgm_fade_out
       );

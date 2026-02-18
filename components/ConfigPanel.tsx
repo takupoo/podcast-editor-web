@@ -506,19 +506,19 @@ export function ConfigPanel() {
               <>
                 <div>
                   <Label htmlFor="bgm-volume">
-                    BGM音量: {config.bgm_volume_db}dB
+                    BGM音量: {config.bgm_target_lufs} LUFS
                   </Label>
                   <p className="text-xs text-gray-500 mb-2">
-                    マイナス値で音声より小さく（推奨: -30dB）
+                    絶対音量指定（推奨: -44 LUFS / 控えめ: -50 / 目立たせる: -36）
                   </p>
                   <Slider
                     id="bgm-volume"
-                    min={-40}
+                    min={-60}
                     max={-20}
                     step={1}
-                    value={[config.bgm_volume_db]}
+                    value={[config.bgm_target_lufs]}
                     onValueChange={([value]) =>
-                      updateConfig({ bgm_volume_db: value })
+                      updateConfig({ bgm_target_lufs: value })
                     }
                   />
                 </div>

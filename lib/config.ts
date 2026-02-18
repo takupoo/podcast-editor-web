@@ -28,7 +28,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   limiter_limit: '-1dB',
 
   // Stage 5-6: Mix
-  bgm_volume_db: -30.0,
+  bgm_target_lufs: -44.0,
   bgm_fade_in: 3.0,
   bgm_fade_out: 3.0,
 

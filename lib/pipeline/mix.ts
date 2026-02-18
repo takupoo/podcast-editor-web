@@ -65,7 +65,7 @@ export async function addBGM(
   voicePath: string,
   bgmPath: string,
   output: string,
-  bgmVolumeDb: number = -30.0,
+  bgmTargetLufs: number = -44.0,
   bgmFadeIn: number = 3.0,
   bgmFadeOut: number = 3.0
 ): Promise<void> {
@@ -76,13 +76,15 @@ export async function addBGM(
 
   const fadeOutStart = Math.max(0, voiceDuration - bgmFadeOut);
 
-  // BGMが本編より短い場合: -stream_loop -1 で入力レベルでループ
+  // BGMが本編より短い場合: -stream_loop で入力レベルでループ
+  // -1（無限）は ffmpeg.wasm で不安定なため、必要なループ数を計算して有限ループに
   // （aloop=size=2e+09 はWASMメモリ不足の原因になるため使用しない）
   const needsLoop = bgmDuration < voiceDuration;
+  const loopCount = needsLoop ? Math.ceil(voiceDuration / bgmDuration) + 1 : 0;
 
   const bgmFilter = [
     `[1:a]atrim=0:${voiceDuration}`,
-    `volume=${bgmVolumeDb}dB`,
+    `loudnorm=I=${bgmTargetLufs}:TP=-1.5:LRA=11`,
     `afade=t=in:d=${bgmFadeIn}`,
     `afade=t=out:st=${fadeOutStart}:d=${bgmFadeOut}[bgm]`,
     '[0:a][bgm]amix=inputs=2:duration=first:normalize=0',
@@ -91,16 +93,14 @@ export async function addBGM(
   await execFF(ffmpeg, [
     '-y',
     '-i', voicePath,
-    ...(needsLoop ? ['-stream_loop', '-1'] : []),
+    ...(needsLoop ? ['-stream_loop', String(loopCount)] : []),
     '-i', bgmPath,
     '-filter_complex', bgmFilter,
     output,
   ], 'Mix:bgm');
 
   console.log(
-    `[Mix] BGM追加完了: ${output} (vol=${bgmVolumeDb}dB, loop=${
-      bgmDuration < voiceDuration
-    })`
+    `[Mix] BGM追加完了: ${output} (lufs=${bgmTargetLufs}, loop=${needsLoop})`
   );
 }
 

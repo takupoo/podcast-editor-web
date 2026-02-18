@@ -33,7 +33,7 @@ export interface ProcessConfig {
   bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト（非永続化）
   bgm_filename?: string;         // BGMファイル名（永続化・共有URL用）
   bgm_url?: string;              // BGM URL（URL入力方式で永続化）
-  bgm_volume_db: number;         // -30.0 dB
+  bgm_target_lufs: number;       // -44.0 LUFS（絶対音量）
   bgm_fade_in: number;           // 3.0秒
   bgm_fade_out: number;          // 3.0秒
 
