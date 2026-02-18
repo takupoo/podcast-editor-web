@@ -13,6 +13,7 @@ const stageNames: Record<string, string> = {
   loudness: 'ラウドネス正規化',
   dynamics: 'ダイナミクス処理',
   mix: 'ミックス',
+  silence: '無音カット',
   bgm: 'BGM追加',
   endscene: 'エンドシーン追加',
   export: 'エクスポート',

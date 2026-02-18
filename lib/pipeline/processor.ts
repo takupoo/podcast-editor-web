@@ -7,6 +7,7 @@ import { applyDenoise } from './denoise';
 import { normalizeLoudness } from './loudness';
 import { applyDynamics } from './dynamics';
 import { mixVoices, addBGM, appendEndscene, exportMP3 } from './mix';
+import { trimSilence } from './silence';
 import { execFF } from './exec';
 
 /**
@@ -252,6 +253,27 @@ export async function processPodcast(
     await safeDelete(ffmpeg, 'processed_b.wav');
 
     let currentFile = 'mixed.wav';
+
+    // Stage 5.5: 無音カット（オプション）
+    if (config.silence_trim_enabled) {
+      onProgress({
+        stage: 'silence',
+        percent: 73,
+        message: '無音区間を検出・カット中...',
+      });
+
+      const prevFile = currentFile;
+      await trimSilence(
+        ffmpeg,
+        currentFile,
+        'silence_trimmed.wav',
+        config.silence_threshold_db,
+        config.silence_min_duration,
+        config.silence_target_duration
+      );
+      await safeDelete(ffmpeg, prevFile);
+      currentFile = 'silence_trimmed.wav';
+    }
 
     // Stage 6: BGM追加（オプション）
     if (config.bgm) {
