@@ -35,6 +35,12 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   // Stage 7: Endscene
   endscene_crossfade: 2.0,
 
+  // Silence Trimming（無音カット）
+  silence_trim_enabled: false,         // デフォルトOFF
+  silence_threshold_db: -35,           // -35dB以下を無音とみなす
+  silence_min_duration: 2.0,           // 2秒以上の無音をカット対象
+  silence_target_duration: 0.5,        // カット後は0.5秒に詰める
+
   // Stage 8: Export
   mp3_bitrate: '192k',
   output_format: 'mp3',

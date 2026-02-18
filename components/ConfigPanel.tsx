@@ -448,6 +448,94 @@ export function ConfigPanel() {
           </AccordionContent>
         </AccordionItem>
 
+        {/* 無音カット */}
+        <AccordionItem value="silence">
+          <AccordionTrigger>無音カット</AccordionTrigger>
+          <AccordionContent className="space-y-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="silence-trim-enabled">無音カット</Label>
+                <p className="text-xs text-gray-500">
+                  長い無音区間を自動で短縮
+                </p>
+              </div>
+              <Switch
+                id="silence-trim-enabled"
+                checked={config.silence_trim_enabled}
+                onCheckedChange={(checked) =>
+                  updateConfig({ silence_trim_enabled: checked })
+                }
+              />
+            </div>
+
+            {config.silence_trim_enabled && (
+              <>
+                <div>
+                  <Label htmlFor="silence-threshold">
+                    無音判定レベル: {config.silence_threshold_db}dB
+                  </Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    この音量以下を無音とみなす（低いほど厳密）
+                  </p>
+                  <Slider
+                    id="silence-threshold"
+                    min={-50}
+                    max={-20}
+                    step={1}
+                    value={[config.silence_threshold_db]}
+                    onValueChange={([value]) =>
+                      updateConfig({ silence_threshold_db: value })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="silence-min-duration">
+                    カット対象の最小無音時間: {config.silence_min_duration.toFixed(1)}秒
+                  </Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    この秒数以上続く無音をカット対象にする
+                  </p>
+                  <Slider
+                    id="silence-min-duration"
+                    min={0.5}
+                    max={10}
+                    step={0.5}
+                    value={[config.silence_min_duration]}
+                    onValueChange={([value]) =>
+                      updateConfig({ silence_min_duration: value })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="silence-target-duration">
+                    カット後の無音の長さ: {config.silence_target_duration.toFixed(1)}秒
+                  </Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    無音を何秒に詰めるか
+                  </p>
+                  <Slider
+                    id="silence-target-duration"
+                    min={0.1}
+                    max={3}
+                    step={0.1}
+                    value={[config.silence_target_duration]}
+                    onValueChange={([value]) =>
+                      updateConfig({ silence_target_duration: value })
+                    }
+                  />
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
+                  <strong>無音カット</strong>はミックス後に適用されます。
+                  両方の話者が無音の区間のみがカット対象になります。
+                </div>
+              </>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
         {/* ミックス */}
         <AccordionItem value="mix">
           <AccordionTrigger>ミックス（BGM・エンドシーン）</AccordionTrigger>

@@ -43,6 +43,12 @@ export interface ProcessConfig {
   endscene_url?: string;         // エンドシーン URL（URL入力方式で永続化）
   endscene_crossfade: number;    // 2.0秒
 
+  // Silence Trimming（無音カット）
+  silence_trim_enabled: boolean;       // 無音カット有効/無効
+  silence_threshold_db: number;        // 無音判定の閾値（dB）例: -35dB
+  silence_min_duration: number;        // この秒数以上の無音をカット対象にする（秒）
+  silence_target_duration: number;     // カット後の無音の長さ（秒）例: 0.5
+
   // Stage 8: Export
   mp3_bitrate: string;           // '192k'
   output_format: 'mp3' | 'wav';
@@ -61,6 +67,7 @@ export type ProcessStage =
   | 'loudness'
   | 'dynamics'
   | 'mix'
+  | 'silence'
   | 'bgm'
   | 'endscene'
   | 'export'
