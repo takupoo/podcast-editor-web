@@ -71,8 +71,19 @@ export async function addBGM(
 ): Promise<void> {
   console.log(`[Mix] BGM追加開始: ${bgmPath}`);
 
+  // Step 1: オリジナルの短いBGMファイルを先に正規化
+  // ループ後の長い音声に loudnorm をかけると WASM メモリ不足になるため、
+  // ループ前の短いファイルに対して正規化を実行する（同じ音声の繰り返しなので等価）
+  const normalizedBgmPath = 'bgm_normalized.wav';
+  await execFF(ffmpeg, [
+    '-y', '-i', bgmPath,
+    '-af', `loudnorm=I=${bgmTargetLufs}:TP=-1.5:LRA=11`,
+    normalizedBgmPath,
+  ], 'Mix:bgm_normalize');
+
+  // Step 2: 正規化済みファイルでループ・ミックス
   const voiceDuration = await getDuration(ffmpeg, voicePath);
-  const bgmDuration = await getDuration(ffmpeg, bgmPath);
+  const bgmDuration = await getDuration(ffmpeg, normalizedBgmPath);
 
   const fadeOutStart = Math.max(0, voiceDuration - bgmFadeOut);
 
@@ -84,7 +95,6 @@ export async function addBGM(
 
   const bgmFilter = [
     `[1:a]atrim=0:${voiceDuration}`,
-    `loudnorm=I=${bgmTargetLufs}:TP=-1.5:LRA=11`,
     `afade=t=in:d=${bgmFadeIn}`,
     `afade=t=out:st=${fadeOutStart}:d=${bgmFadeOut}[bgm]`,
     '[0:a][bgm]amix=inputs=2:duration=first:normalize=0',
@@ -94,10 +104,12 @@ export async function addBGM(
     '-y',
     '-i', voicePath,
     ...(needsLoop ? ['-stream_loop', String(loopCount)] : []),
-    '-i', bgmPath,
+    '-i', normalizedBgmPath,
     '-filter_complex', bgmFilter,
     output,
   ], 'Mix:bgm');
+
+  try { await ffmpeg.deleteFile(normalizedBgmPath); } catch { /* 無視 */ }
 
   console.log(
     `[Mix] BGM追加完了: ${output} (lufs=${bgmTargetLufs}, loop=${needsLoop})`
