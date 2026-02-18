@@ -2,6 +2,38 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { execFF } from './exec';
 
 /**
+ * BGMファイルの統合ラウドネス（LUFS）を計測
+ * loudnorm=print_format=json を使い -f null - で出力なし
+ * （WAVファイルを中間出力するとWASMヒープを圧迫するため使わない）
+ */
+async function measureBgmLufs(ffmpeg: FFmpeg, bgmPath: string): Promise<number> {
+  const logMessages: string[] = [];
+  const logHandler = ({ message }: { message: string }) => {
+    logMessages.push(message);
+  };
+  ffmpeg.on('log', logHandler);
+  try {
+    // execFF は使わず生の exec（非ゼロ終了でもログは収集済み）
+    await ffmpeg.exec([
+      '-y', '-i', bgmPath,
+      '-af', 'loudnorm=print_format=json',
+      '-f', 'null', '-',
+    ]);
+  } catch { /* FFmpeg.wasm は Aborted() を投げるがログは収集できている */ }
+  finally {
+    ffmpeg.off('log', logHandler);
+  }
+  const logText = logMessages.join('\n');
+  const jsonMatch = logText.match(/\{[^{}]*\}/);
+  if (!jsonMatch) {
+    console.warn('[Mix] BGMラウドネス計測: JSONが見つからないためゲイン0で続行');
+    return 0; // フォールバック: 調整なし
+  }
+  const stats = JSON.parse(jsonMatch[0]);
+  return parseFloat(stats.input_i);
+}
+
+/**
  * 音声ファイルの長さ（秒）を取得
  * FFmpeg.wasmのFS内ファイルをWeb Audio APIでデコードして取得
  * （FFmpeg execのログ解析は不安定なため採用しない）
@@ -71,19 +103,15 @@ export async function addBGM(
 ): Promise<void> {
   console.log(`[Mix] BGM追加開始: ${bgmPath}`);
 
-  // Step 1: オリジナルの短いBGMファイルを先に正規化
-  // ループ後の長い音声に loudnorm をかけると WASM メモリ不足になるため、
-  // ループ前の短いファイルに対して正規化を実行する（同じ音声の繰り返しなので等価）
-  const normalizedBgmPath = 'bgm_normalized.wav';
-  await execFF(ffmpeg, [
-    '-y', '-i', bgmPath,
-    '-af', `loudnorm=I=${bgmTargetLufs}:TP=-1.5:LRA=11`,
-    normalizedBgmPath,
-  ], 'Mix:bgm_normalize');
+  // Step 1: BGMの現在のラウドネスを計測し、目標との差分をゲインdBで算出
+  // 中間WAVファイルは作らない（WASMヒープを圧迫するため）
+  const measuredLufs = await measureBgmLufs(ffmpeg, bgmPath);
+  const gainDb = bgmTargetLufs - measuredLufs;
+  console.log(`[Mix] BGM: 計測=${measuredLufs.toFixed(1)} LUFS, 目標=${bgmTargetLufs} LUFS, ゲイン=${gainDb.toFixed(1)} dB`);
 
-  // Step 2: 正規化済みファイルでループ・ミックス
+  // Step 2: ゲイン補正 + ループ + ミックス
   const voiceDuration = await getDuration(ffmpeg, voicePath);
-  const bgmDuration = await getDuration(ffmpeg, normalizedBgmPath);
+  const bgmDuration = await getDuration(ffmpeg, bgmPath);
 
   const fadeOutStart = Math.max(0, voiceDuration - bgmFadeOut);
 
@@ -95,6 +123,7 @@ export async function addBGM(
 
   const bgmFilter = [
     `[1:a]atrim=0:${voiceDuration}`,
+    `volume=${gainDb}dB`,
     `afade=t=in:d=${bgmFadeIn}`,
     `afade=t=out:st=${fadeOutStart}:d=${bgmFadeOut}[bgm]`,
     '[0:a][bgm]amix=inputs=2:duration=first:normalize=0',
@@ -104,12 +133,10 @@ export async function addBGM(
     '-y',
     '-i', voicePath,
     ...(needsLoop ? ['-stream_loop', String(loopCount)] : []),
-    '-i', normalizedBgmPath,
+    '-i', bgmPath,
     '-filter_complex', bgmFilter,
     output,
   ], 'Mix:bgm');
-
-  try { await ffmpeg.deleteFile(normalizedBgmPath); } catch { /* 無視 */ }
 
   console.log(
     `[Mix] BGM追加完了: ${output} (lufs=${bgmTargetLufs}, loop=${needsLoop})`
