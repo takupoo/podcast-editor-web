@@ -18,6 +18,17 @@ function extractFilename(url: string): string {
   return url.split('/').pop()?.split('?')[0] ?? 'audio.mp3';
 }
 
+/** GitHub の blob URL を raw URL に自動変換
+ *  https://github.com/user/repo/blob/branch/path
+ *  → https://raw.githubusercontent.com/user/repo/branch/path
+ */
+function toRawUrl(url: string): string {
+  return url.replace(
+    /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//,
+    'https://raw.githubusercontent.com/$1/'
+  );
+}
+
 export function ConfigPanel() {
   const { config, updateConfig } = useAppStore();
   const [bgmFile, setBgmFile] = useState<File | null>(null);
@@ -151,17 +162,19 @@ export function ConfigPanel() {
     if (!bgmUrl) return;
     setBgmUrlLoading(true);
     setBgmUrlError(null);
+    const rawUrl = toRawUrl(bgmUrl);
+    if (rawUrl !== bgmUrl) setBgmUrl(rawUrl);
     try {
-      const res = await fetch(bgmUrl);
+      const res = await fetch(rawUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buffer = await res.arrayBuffer();
-      const filename = extractFilename(bgmUrl);
+      const filename = extractFilename(rawUrl);
       const file = new File([buffer], filename, {
         type: res.headers.get('content-type') ?? 'audio/mpeg',
       });
       setBgmFile(file);
       setBgmFromCache(false);
-      updateConfig({ bgm: file, bgm_filename: filename, bgm_url: bgmUrl });
+      updateConfig({ bgm: file, bgm_filename: filename, bgm_url: rawUrl });
       clearFileFromCache('bgm'); // URL方式が優先: IndexedDB のエントリを削除
     } catch {
       setBgmUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
@@ -174,17 +187,19 @@ export function ConfigPanel() {
     if (!endsceneUrl) return;
     setEndsceneUrlLoading(true);
     setEndsceneUrlError(null);
+    const rawUrl = toRawUrl(endsceneUrl);
+    if (rawUrl !== endsceneUrl) setEndsceneUrl(rawUrl);
     try {
-      const res = await fetch(endsceneUrl);
+      const res = await fetch(rawUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buffer = await res.arrayBuffer();
-      const filename = extractFilename(endsceneUrl);
+      const filename = extractFilename(rawUrl);
       const file = new File([buffer], filename, {
         type: res.headers.get('content-type') ?? 'audio/mpeg',
       });
       setEndsceneFile(file);
       setEndsceneFromCache(false);
-      updateConfig({ endscene: file, endscene_filename: filename, endscene_url: endsceneUrl });
+      updateConfig({ endscene: file, endscene_filename: filename, endscene_url: rawUrl });
       clearFileFromCache('endscene');
     } catch {
       setEndsceneUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
