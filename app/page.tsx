@@ -6,190 +6,422 @@ import { FileUploader } from '@/components/FileUploader';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
-
-// SSR時にlocalStorageからの初期値とサーバー側のデフォルト値が異なるため
-// Hydrationエラーを防ぐためSSRを無効化
-const ConfigPanel = dynamic(
-  () => import('@/components/ConfigPanel').then((m) => ({ default: m.ConfigPanel })),
-  { ssr: false }
-);
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 
-export default function Home() {
-  const { config, fileA, fileB, setFileA, setFileB } = useAppStore();
-  const [mounted, setMounted] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState<ProcessProgress | null>(null);
-  const [result, setResult] = useState<Blob | null>(null);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+// SSR時のHydrationエラーを防ぐためSSRを無効化
+import type { ConfigSection } from '@/components/ConfigPanel';
+const ConfigPanel = dynamic<{ activeSection: ConfigSection }>(
+  () => import('@/components/ConfigPanel').then((m) => ({ default: m.ConfigPanel })),
+  { ssr: false }
+);
 
-  // マウント後にのみZustandのpersistedな値を使う（Hydration対策）
+// ── Section types ─────────────────────────────────────────────
+type SectionId =
+  | 'source'
+  | 'overview'
+  | 'preview'
+  | 'trim'
+  | 'processing'
+  | 'silence'
+  | 'mix'
+  | 'export';
+
+interface NavSection {
+  id: SectionId;
+  label: string;
+  dot?: 'on' | 'off' | 'none';
+}
+
+const STAGES: NavSection[] = [
+  { id: 'overview',    label: '概要',              dot: 'none' },
+  { id: 'preview',     label: '🚀 プレビュー',     dot: 'none' },
+  { id: 'trim',        label: '1. トリム',          dot: 'on'   },
+  { id: 'processing',  label: '2–4. 音声処理',     dot: 'on'   },
+  { id: 'silence',     label: '5. 無音カット',      dot: 'off'  },
+  { id: 'mix',         label: '6. BGM・エンドシーン', dot: 'on' },
+  { id: 'export',      label: '7. エクスポート',   dot: 'none' },
+];
+
+// ── Stage icon as SVG string component ────────────────────────
+function NavIcon({ id }: { id: SectionId }) {
+  const cls = 'w-3.5 h-3.5';
+  switch (id) {
+    case 'source':
+      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>;
+    case 'overview':
+      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z"/></svg>;
+    case 'preview':
+      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>;
+    case 'trim':
+      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>;
+    case 'processing':
+      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>;
+    case 'silence':
+      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2"/></svg>;
+    case 'mix':
+      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>;
+    case 'export':
+      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>;
+  }
+}
+
+// ── Overview pipeline summary ──────────────────────────────────
+function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
+  const { config } = useAppStore();
+  const items = [
+    { id: 'trim' as SectionId,       label: 'トリム',              desc: 'クラップ検出・前後カット',                          on: true  },
+    { id: 'processing' as SectionId, label: 'ノイズ除去',          desc: `Spectral モード · ${config.noise_gate_threshold} dB`,   on: config.denoise_enabled },
+    { id: 'processing' as SectionId, label: 'ラウドネス正規化',    desc: `目標 ${config.target_lufs} LUFS · EBU R128`,            on: true  },
+    { id: 'processing' as SectionId, label: 'ダイナミクス',        desc: `コンプレッサー ${config.comp_ratio}:1`,                  on: true  },
+    { id: 'mix' as SectionId,        label: 'BGM',                 desc: config.bgm_filename ? `${config.bgm_filename} · ${config.bgm_target_lufs} LUFS` : 'ファイル未設定', on: !!config.bgm_filename },
+    { id: 'mix' as SectionId,        label: 'エンドシーン',        desc: config.endscene_filename ?? 'ファイル未設定',             on: !!config.endscene_filename },
+    { id: 'silence' as SectionId,    label: '無音カット',          desc: `${config.silence_min_duration}秒以上 → ${config.silence_target_duration}秒に短縮`, on: config.silence_trim_enabled },
+  ];
+  return (
+    <div className="p-6 flex flex-col gap-4">
+      <div className="mb-1">
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.35px' }}>処理パイプライン</h2>
+        <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>ステージをクリックして詳細設定を開く</p>
+      </div>
+      <div className="flex flex-col gap-1">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            onClick={() => onNavigate(item.id)}
+            className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors duration-100"
+            style={{ ':hover': { background: 'rgba(255,255,255,0.05)' } } as React.CSSProperties}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+            onMouseLeave={e => (e.currentTarget.style.background = '')}
+          >
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(255,255,255,0.09)',
+              border: '1px solid rgba(255,255,255,0.11)',
+              fontSize: 11, fontWeight: 700, color: 'var(--tg-t2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{i + 1}</div>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--tg-t1)', fontWeight: 500 }}>{item.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 1 }}>{item.desc}</div>
+            </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                padding: '3px 9px', borderRadius: 100,
+                background: item.on ? 'rgba(48,209,88,0.15)' : 'rgba(255,255,255,0.06)',
+                color: item.on ? 'var(--tg-green)' : 'var(--tg-t3)',
+                border: `1px solid ${item.on ? 'rgba(48,209,88,0.2)' : 'rgba(255,255,255,0.09)'}`,
+              }}>
+                {item.on ? 'ON' : 'OFF'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────
+export default function Home() {
+  const { config, fileA, fileB, setFileA, setFileB, resetConfig } = useAppStore();
+  const [mounted, setMounted]       = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionId>('source');
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress]     = useState<ProcessProgress | null>(null);
+  const [result, setResult]         = useState<Blob | null>(null);
+  const [copied, setCopied]         = useState(false);
+  const [notifPerm, setNotifPerm]   = useState<NotificationPermission>('default');
+
   useEffect(() => setMounted(true), []);
 
-  // 通知許可をリクエスト
   useEffect(() => {
     if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
+      setNotifPerm(Notification.permission);
       if (Notification.permission === 'default') {
-        Notification.requestPermission().then(permission => {
-          setNotificationPermission(permission);
-        });
+        Notification.requestPermission().then(p => setNotifPerm(p));
       }
     }
   }, []);
 
-  // ブラウザ通知を送信
-  const sendNotification = (title: string, body: string) => {
+  const notify = (title: string, body: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, {
-        body,
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-      });
+      new Notification(title, { body, icon: '/favicon.ico' });
     }
   };
 
   const handleProcess = async () => {
     if (!fileA || !fileB) return;
-
     setProcessing(true);
     setResult(null);
     setProgress(null);
-
     try {
-      const output = await processPodcast(fileA, fileB, config, (p) => {
-        setProgress(p);
-      });
+      const output = await processPodcast(fileA, fileB, config, p => setProgress(p));
       setResult(output);
-
-      // 処理完了通知
-      sendNotification(
-        '処理完了！',
-        'ポッドキャストの編集が完了しました。ダウンロードできます。'
-      );
+      notify('処理完了！', 'ポッドキャストの編集が完了しました。');
     } catch (error) {
-      console.error('処理エラー:', error);
-      setProgress({
-        stage: 'error',
-        percent: 0,
-        message: `エラーが発生しました: ${error}`,
-      });
-
-      // エラー通知
-      sendNotification(
-        '処理エラー',
-        'ポッドキャストの編集中にエラーが発生しました。'
-      );
+      setProgress({ stage: 'error', percent: 0, message: `エラーが発生しました: ${error}` });
+      notify('処理エラー', 'ポッドキャストの編集中にエラーが発生しました。');
     } finally {
       setProcessing(false);
     }
   };
 
-  const canProcess = fileA && fileB && !processing;
+  const handleShareConfig = async () => {
+    const { generateShareUrl } = await import('@/lib/config-url');
+    const url = generateShareUrl(config);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { alert('URLのコピーに失敗しました'); }
+  };
+
+  const canProcess = !!fileA && !!fileB && !processing;
+
+  const processLabel = processing
+    ? '処理中...'
+    : (mounted && config.preview_mode)
+      ? `プレビュー（${config.preview_duration}秒）`
+      : '処理実行';
+
+  const statusText = processing
+    ? (progress?.message ?? '処理中...')
+    : result
+      ? '処理完了'
+      : fileA && fileB
+        ? '処理準備完了'
+        : '準備完了';
+
+  const fileInfoText = fileA && fileB
+    ? `${fileA.name}  ·  ${fileB.name}`
+    : fileA
+      ? fileA.name
+      : 'ファイル未選択';
+
+  // ── Sidebar nav sections ────────────────────────────────────
+  const SOURCE_NAV: NavSection = { id: 'source', label: '音声ファイル', dot: 'none' };
+
+  const navigate = (id: SectionId) => setActiveSection(id);
+
+  // ── Render panel content ────────────────────────────────────
+  const renderPanel = () => {
+    switch (activeSection) {
+      case 'source':
+        return (
+          <div className="p-6 flex flex-col gap-5">
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>音声ファイル</h2>
+              <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>処理対象の音声ファイルを選択（話者A・B）</p>
+            </div>
+            <FileUploader fileA={fileA} fileB={fileB} onFileAChange={setFileA} onFileBChange={setFileB} />
+            <div className="tg-notice">
+              <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+              <span>すべての処理はブラウザ内で完結します。ファイルはサーバーに送信されません。</span>
+            </div>
+            {(progress || result) && (
+              <div className="flex flex-col gap-4 mt-2">
+                {progress && !result && <ProcessingStatus progress={progress} />}
+                {result && (
+                  <ResultDownload
+                    blob={result}
+                    filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      case 'overview':
+        return <OverviewPanel onNavigate={navigate} />;
+      default:
+        return (
+          <ConfigPanel activeSection={activeSection} />
+        );
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* ヘッダー */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Podcast Processor
-          </h1>
-          <p className="text-lg text-gray-600">
-            2人の音声ファイルを自動でミックス・編集
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            ブラウザ内で完結（サーバー不要・完全無料）
-          </p>
+    <div className="tg-root flex items-stretch justify-center min-h-dvh p-0 md:p-8">
+      {/* Glass window – full screen on mobile, centered card on desktop */}
+      <div
+        className="tg-window flex flex-col w-full md:w-auto md:min-w-[900px] md:max-w-[1040px] md:rounded-[28px] overflow-hidden"
+        style={{ minHeight: '100dvh' }}
+      >
+        {/* ── Titlebar ──────────────────────────────────────── */}
+        <div
+          className="flex items-center px-4 shrink-0"
+          style={{
+            height: 28,
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            position: 'relative',
+          }}
+        >
+          {/* Traffic lights (only visible on desktop/md+) */}
+          <div className="hidden md:flex gap-2 items-center">
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #ff7b72, #ff5f57)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #fedc6e, #febc2e)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #56e775, #28c840)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
+          </div>
+          <div style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+            fontSize: 13, fontWeight: 500, color: 'var(--tg-t2)', letterSpacing: '-0.1px',
+          }}>
+            Podcast Editor
+          </div>
         </div>
 
-        {/* ファイルアップロード */}
-        <div className="mb-8">
-          <FileUploader
-            fileA={fileA}
-            fileB={fileB}
-            onFileAChange={setFileA}
-            onFileBChange={setFileB}
-          />
-        </div>
+        {/* ── Toolbar ───────────────────────────────────────── */}
+        <div
+          className="flex items-center px-4 gap-3 shrink-0"
+          style={{
+            height: 48,
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          {/* Segmented preview/full */}
+          {mounted && (
+            <div className="tg-seg">
+              <button
+                className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
+                onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
+              >
+                全体処理
+              </button>
+              <button
+                className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
+                onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
+              >
+                プレビュー
+              </button>
+            </div>
+          )}
 
-        {/* 詳細設定 */}
-        <div className="mb-8">
-          <ConfigPanel />
-        </div>
+          <div style={{ flex: 1 }} />
 
-        {/* 処理ボタン */}
-        <div className="text-center mb-8">
+          {/* File badge */}
+          {(fileA || fileB) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 12px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.11)',
+              borderRadius: 100,
+              fontSize: 12, color: 'var(--tg-t1)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+              maxWidth: 240, overflow: 'hidden',
+            }}>
+              <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {fileA ? fileA.name : ''}{fileA && fileB ? ' · ' : ''}{fileB ? fileB.name : ''}
+              </span>
+            </div>
+          )}
+
+          {/* Share config */}
+          <button className="tg-btn" onClick={handleShareConfig}>
+            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M11 2a2 2 0 0 1 2 2 2 2 0 0 1-2 2 2 2 0 0 1-1.73-1H6.5A2 2 0 0 1 5 6.5a2 2 0 0 1-1 1.73V10.5A2 2 0 0 1 5 12.27 2 2 0 0 1 6.5 14H9.27A2 2 0 0 1 11 13a2 2 0 0 1 2 2 2 2 0 0 1-2 2 2 2 0 0 1-1.73-1H6.5A2 2 0 0 1 4 14a2 2 0 0 1-2-1.73V8.23A2 2 0 0 1 1 6.5 2 2 0 0 1 3 4.5a2 2 0 0 1 1 .27V4a2 2 0 0 1 1.73-2H9.27A2 2 0 0 1 11 1z"/></svg>
+            {copied ? '✓ コピー済み' : '設定共有'}
+          </button>
+
+          {/* Reset */}
+          <button className="tg-btn" onClick={resetConfig}>
+            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
+            リセット
+          </button>
+
+          {/* Process */}
           <button
+            className="tg-btn tg-btn-primary"
             onClick={handleProcess}
             disabled={!canProcess}
-            className={`
-              px-8 py-4 rounded-lg font-semibold text-white text-lg
-              transition-all
-              ${
-                canProcess
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl'
-                  : 'bg-gray-300 cursor-not-allowed'
-              }
-            `}
           >
-            {processing
-              ? '処理中...'
-              : (mounted && config.preview_mode)
-                ? `プレビュー処理（最初の${config.preview_duration}秒）`
-                : '処理開始'}
+            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+            {processLabel}
           </button>
-          {!fileA || !fileB ? (
-            <p className="text-sm text-gray-500 mt-2">
-              両方のファイルを選択してください
-            </p>
-          ) : null}
-          {notificationPermission === 'granted' && (
-            <p className="text-xs text-green-600 mt-2">
-              🔔 処理完了時にブラウザ通知します
-            </p>
-          )}
-          {notificationPermission === 'denied' && (
-            <p className="text-xs text-gray-500 mt-2">
-              通知が無効です（ブラウザ設定で有効にできます）
-            </p>
-          )}
         </div>
 
-        {/* 処理進捗 */}
-        {progress && !result && (
-          <div className="mb-8">
-            <ProcessingStatus progress={progress} />
-          </div>
-        )}
+        {/* ── Body ──────────────────────────────────────────── */}
+        <div className="flex flex-1 overflow-hidden">
 
-        {/* 結果ダウンロード */}
-        {result && (
-          <div className="mb-8">
-            <ResultDownload
-              blob={result}
-              filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
-            />
-          </div>
-        )}
+          {/* Sidebar */}
+          <aside
+            className="tg-sidebar shrink-0 flex flex-col py-2"
+            style={{ width: 220, overflowY: 'auto' }}
+          >
+            {/* Source */}
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>ソース</div>
+            <button
+              className={`tg-nav${activeSection === SOURCE_NAV.id ? ' active' : ''}`}
+              onClick={() => navigate(SOURCE_NAV.id)}
+            >
+              <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === 'source' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                <NavIcon id="source" />
+              </div>
+              <span style={{ fontSize: 13, color: activeSection === 'source' ? 'var(--tg-t1)' : 'var(--tg-t2)' }}>音声ファイル</span>
+              {(fileA || fileB) && (
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--tg-t3)' }}>
+                  {[fileA, fileB].filter(Boolean).length}
+                </span>
+              )}
+            </button>
 
-        {/* フッター情報 */}
-        <div className="mt-12 p-6 bg-white rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-3">処理内容</h2>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>✓ クラップ検出・同期（録音開始時の手拍子で2トラックを自動同期）</li>
-            <li>✓ ノイズ除去（FFT/NLMeansベース、ホワイトノイズに効果的）</li>
-            <li>✓ ラウドネス正規化（-16 LUFS）</li>
-            <li>✓ ダイナミクス処理（コンプレッサー + リミッター）</li>
-            <li>✓ ステレオミックス</li>
-            <li>✓ BGM追加（オプション、自動ループ・フェード）</li>
-            <li>✓ エンドシーン追加（オプション、クロスフェード）</li>
-            <li>✓ MP3/WAVエンコード（ビットレート調整可能）</li>
-          </ul>
-          <p className="text-xs text-gray-500 mt-4">
-            Week 3版: FFT/NLMeansノイズ除去実装。全パラメータ調整可能
-          </p>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '8px 0' }} />
+
+            {/* Stages */}
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>処理ステージ</div>
+            {STAGES.map(s => (
+              <button
+                key={s.id}
+                className={`tg-nav${activeSection === s.id ? ' active' : ''}`}
+                onClick={() => navigate(s.id)}
+              >
+                <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === s.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                  <NavIcon id={s.id} />
+                </div>
+                <span style={{ fontSize: 13, color: activeSection === s.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{s.label}</span>
+                {s.dot !== 'none' && s.dot && (
+                  <div className={`tg-dot ${s.dot === 'on' ? 'tg-dot-on' : 'tg-dot-off'}`} style={{ marginLeft: 'auto', flexShrink: 0 }} />
+                )}
+              </button>
+            ))}
+          </aside>
+
+          {/* Main panel */}
+          <main
+            className="flex-1 overflow-y-auto"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
+          >
+            {renderPanel()}
+          </main>
+        </div>
+
+        {/* ── Status bar ────────────────────────────────────── */}
+        <div
+          className="flex items-center px-4 gap-3 shrink-0"
+          style={{
+            height: 24,
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(0,0,0,0.15)',
+          }}
+        >
+          <div style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: result ? 'var(--tg-green)' : processing ? 'var(--tg-accent)' : 'var(--tg-green)',
+            boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : processing ? '0 0 6px rgba(10,132,255,.5)' : '0 0 6px rgba(48,209,88,.3)',
+          }} />
+          <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
+          {processing && progress && (
+            <div style={{ width: 120, height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1 }}>
+              <div style={{ height: '100%', width: `${progress.percent}%`, background: 'var(--tg-accent)', borderRadius: 1, transition: 'width 0.5s' }} />
+            </div>
+          )}
+          {notifPerm === 'granted' && (
+            <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>🔔 完了時に通知</span>
+          )}
+          <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: notifPerm === 'granted' ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
         </div>
       </div>
     </div>

@@ -1,27 +1,22 @@
 'use client';
 
 import { useAppStore } from '@/lib/store';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
-import { generateShareUrl } from '@/lib/config-url';
 import { saveFileToCache, loadFileFromCache, clearFileFromCache } from '@/lib/file-cache';
+
+export type ConfigSection = 'preview' | 'trim' | 'processing' | 'silence' | 'mix' | 'export';
+
+interface ConfigPanelProps {
+  activeSection: ConfigSection;
+}
 
 function extractFilename(url: string): string {
   return url.split('/').pop()?.split('?')[0] ?? 'audio.mp3';
 }
 
-/** GitHub の blob URL を raw URL に自動変換
- *  https://github.com/user/repo/blob/branch/path
- *  → https://raw.githubusercontent.com/user/repo/branch/path
- */
+/** GitHub の blob URL を raw URL に自動変換 */
 function toRawUrl(url: string): string {
   return url.replace(
     /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//,
@@ -29,139 +24,472 @@ function toRawUrl(url: string): string {
   );
 }
 
-export function ConfigPanel() {
+// ── Shared sub-components ──────────────────────────────────────
+
+function GrpHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: '9px 16px 5px',
+      fontSize: 11, fontWeight: 600,
+      color: 'var(--tg-t3)',
+      letterSpacing: '0.5px',
+      textTransform: 'uppercase' as const,
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function Row({ label, hint, right }: { label: string; hint?: string; right: React.ReactNode }) {
+  return (
+    <div className="tg-row">
+      <div style={{ minWidth: 150, flexShrink: 0 }}>
+        <div style={{ fontSize: 13, color: 'var(--tg-t1)' }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>{hint}</div>}
+      </div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+        {right}
+      </div>
+    </div>
+  );
+}
+
+function SliderRow({
+  id, min, max, step, value, onChange, valueLabel,
+}: {
+  id: string; min: number; max: number; step: number;
+  value: number; onChange: (v: number) => void; valueLabel: string;
+}) {
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 11, color: 'var(--tg-t3)', flexShrink: 0, minWidth: 32 }}>{min}</span>
+      <Slider
+        id={id}
+        min={min} max={max} step={step}
+        value={[value]}
+        onValueChange={([v]) => onChange(v)}
+        className="flex-1"
+      />
+      <span style={{ fontSize: 11, color: 'var(--tg-t3)', flexShrink: 0, minWidth: 32 }}>{max}</span>
+      <span style={{ fontSize: 12, color: 'var(--tg-t2)', fontFamily: 'var(--font-mono, monospace)', minWidth: 72, textAlign: 'right' }}>{valueLabel}</span>
+    </div>
+  );
+}
+
+function Notice({ children, variant = 'info' }: { children: React.ReactNode; variant?: 'info' | 'warn' | 'success' }) {
+  return (
+    <div className={`tg-notice${variant === 'warn' ? ' warn' : variant === 'success' ? ' success' : ''}`}>
+      <svg style={{ width: 14, height: 14, color: variant === 'warn' ? 'var(--tg-orange)' : variant === 'success' ? 'var(--tg-green)' : 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>
+      </svg>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function StageHeader({ icon, title, desc, enabledKey }: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  enabledKey?: keyof ReturnType<typeof useAppStore.getState>['config'];
+}) {
   const { config, updateConfig } = useAppStore();
-  const [bgmFile, setBgmFile] = useState<File | null>(null);
-  const [endsceneFile, setEndsceneFile] = useState<File | null>(null);
-  const [copied, setCopied] = useState(false);
+  const enabled = enabledKey ? config[enabledKey] as boolean : undefined;
 
-  // IndexedDB / URL 復元関連
-  const [bgmFromCache, setBgmFromCache] = useState(false);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 4 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 16px rgba(0,0,0,0.4)' }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{desc}</div>
+      </div>
+      {enabledKey && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--tg-t2)' }}>有効</span>
+          <Switch
+            checked={enabled}
+            onCheckedChange={(v) => updateConfig({ [enabledKey]: v } as Parameters<typeof updateConfig>[0])}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Section panels ─────────────────────────────────────────────
+
+function PreviewSection() {
+  const { config, updateConfig } = useAppStore();
+  return (
+    <div className="flex flex-col gap-4">
+      <StageHeader
+        icon={<span style={{ fontSize: 22 }}>🚀</span>}
+        title="プレビューモード"
+        desc="最初のN秒のみ処理して音質を素早く比較"
+        enabledKey="preview_mode"
+      />
+      <div className="tg-grp">
+        <GrpHeader>設定</GrpHeader>
+        {config.preview_mode && (
+          <Row
+            label="プレビュー時間"
+            hint="処理する長さ（推奨: 30秒）"
+            right={
+              <SliderRow
+                id="preview-duration"
+                min={10} max={60} step={5}
+                value={config.preview_duration}
+                onChange={v => updateConfig({ preview_duration: v })}
+                valueLabel={`${config.preview_duration} 秒`}
+              />
+            }
+          />
+        )}
+      </div>
+      <Notice>
+        <strong>プレビューモード</strong>を使うと、異なるノイズ除去方式を素早く比較できます。各設定で処理を実行 → ダウンロード → ローカル版と聴き比べ
+      </Notice>
+    </div>
+  );
+}
+
+function TrimSection() {
+  const { config, updateConfig } = useAppStore();
+  return (
+    <div className="flex flex-col gap-4">
+      <StageHeader
+        icon={
+          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="6" y1="9" x2="6" y2="3"/><line x1="18" y1="9" x2="18" y2="3"/>
+            <line x1="2" y1="17" x2="22" y2="17"/>
+            <path d="M6 9 L2 13"/><path d="M6 9 L10 13"/><path d="M18 9 L14 13"/><path d="M18 9 L22 13"/>
+          </svg>
+        }
+        title="トリム"
+        desc="クラップ音検出による前後カット"
+      />
+      <div className="tg-grp" style={{ background: 'linear-gradient(145deg,rgba(255,159,10,0.06),transparent)' }}>
+        <GrpHeader>検出</GrpHeader>
+        <Row
+          label="クラップ検出閾値"
+          hint="低いほど小さい音でも検出（推奨: -10dB）"
+          right={
+            <SliderRow
+              id="clap-threshold" min={-20} max={-5} step={1}
+              value={config.clap_threshold_db}
+              onChange={v => updateConfig({ clap_threshold_db: v })}
+              valueLabel={`${config.clap_threshold_db} dB`}
+            />
+          }
+        />
+      </div>
+      <div className="tg-grp">
+        <GrpHeader>余白</GrpHeader>
+        <Row
+          label="クラップ前の余白"
+          hint="クラップ前に残す時間"
+          right={
+            <SliderRow
+              id="pre-clap-margin" min={0} max={3} step={0.1}
+              value={config.pre_clap_margin}
+              onChange={v => updateConfig({ pre_clap_margin: v })}
+              valueLabel={`${config.pre_clap_margin.toFixed(1)} 秒`}
+            />
+          }
+        />
+        <Row
+          label="クラップ後カット"
+          hint="クラップから何秒後から録音開始するか（0=クラップ残す）"
+          right={
+            <SliderRow
+              id="post-clap-cut" min={0} max={2} step={0.1}
+              value={config.post_clap_cut}
+              onChange={v => updateConfig({ post_clap_cut: v })}
+              valueLabel={`${config.post_clap_cut.toFixed(1)} 秒`}
+            />
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProcessingSection() {
+  const { config, updateConfig } = useAppStore();
+  return (
+    <div className="flex flex-col gap-4">
+      {/* ノイズ除去 */}
+      <StageHeader
+        icon={
+          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M2 12 Q5 4 8 12 Q11 20 14 12 Q17 4 20 8"/><path d="M20 8 L22 8"/>
+          </svg>
+        }
+        title="ノイズ除去 / ラウドネス / ダイナミクス"
+        desc="音声処理パイプライン（Stage 2–4）"
+        enabledKey="denoise_enabled"
+      />
+
+      {/* Denoise method */}
+      <div className="tg-grp">
+        <GrpHeader>ノイズ除去アルゴリズム</GrpHeader>
+        <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
+            <label
+              key={method}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                background: config.denoise_method === method ? 'rgba(10,132,255,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${config.denoise_method === method ? 'rgba(10,132,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                transition: 'all 0.14s',
+              }}
+            >
+              <input
+                type="radio"
+                name="denoise_method"
+                value={method}
+                checked={config.denoise_method === method}
+                onChange={() => updateConfig({ denoise_method: method })}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>
+                  {method === 'spectral' && 'スペクトル減算（推奨）'}
+                  {method === 'afftdn' && 'afftdn（FFTベース）'}
+                  {method === 'anlmdn' && 'anlmdn（NLMeans）'}
+                  {method === 'none' && 'なし（フィルタのみ）'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>
+                  {method === 'spectral' && '録音内の静かなフレームからノイズを学習。サー音・キーン音・ファン音に最も効果的。'}
+                  {method === 'afftdn' && 'FFTベース。時間的ノイズ追跡あり。軽量で定常ノイズに効果的。'}
+                  {method === 'anlmdn' && '非局所平均ベース。高品質だが処理が重い。'}
+                  {method === 'none' && 'highpass + lowpassのみ。ノイズ除去なし。'}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+        {config.denoise_method !== 'none' && (
+          <Row
+            label="ノイズフロア閾値"
+            hint="低いほど弱いノイズも除去（推奨: -50dB）"
+            right={
+              <SliderRow
+                id="noise-gate-threshold" min={-60} max={-30} step={5}
+                value={config.noise_gate_threshold}
+                onChange={v => updateConfig({ noise_gate_threshold: v })}
+                valueLabel={`${config.noise_gate_threshold} dB`}
+              />
+            }
+          />
+        )}
+      </div>
+
+      {/* Loudness */}
+      <div className="tg-grp">
+        <GrpHeader>ラウドネス正規化（EBU R128）</GrpHeader>
+        <Row
+          label="目標ラウドネス"
+          hint="ポッドキャスト標準: -16 LUFS"
+          right={
+            <SliderRow
+              id="target-lufs" min={-20} max={-12} step={0.5}
+              value={config.target_lufs}
+              onChange={v => updateConfig({ target_lufs: v })}
+              valueLabel={`${config.target_lufs} LUFS`}
+            />
+          }
+        />
+        <Row
+          label="True Peak"
+          right={
+            <SliderRow
+              id="true-peak" min={-3} max={0} step={0.5}
+              value={config.true_peak}
+              onChange={v => updateConfig({ true_peak: v })}
+              valueLabel={`${config.true_peak} dBTP`}
+            />
+          }
+        />
+      </div>
+
+      {/* Dynamics */}
+      <div className="tg-grp">
+        <GrpHeader>ダイナミクス（コンプレッサー）</GrpHeader>
+        <Row
+          label="レシオ"
+          hint="大きいほど圧縮が強い（推奨: 4:1）"
+          right={
+            <SliderRow
+              id="comp-ratio" min={2} max={10} step={1}
+              value={config.comp_ratio}
+              onChange={v => updateConfig({ comp_ratio: v })}
+              valueLabel={`${config.comp_ratio} : 1`}
+            />
+          }
+        />
+        <Row
+          label="アタック"
+          right={
+            <SliderRow
+              id="comp-attack" min={1} max={100} step={1}
+              value={config.comp_attack}
+              onChange={v => updateConfig({ comp_attack: v })}
+              valueLabel={`${config.comp_attack} ms`}
+            />
+          }
+        />
+        <Row
+          label="リリース"
+          right={
+            <SliderRow
+              id="comp-release" min={10} max={500} step={10}
+              value={config.comp_release}
+              onChange={v => updateConfig({ comp_release: v })}
+              valueLabel={`${config.comp_release} ms`}
+            />
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function SilenceSection() {
+  const { config, updateConfig } = useAppStore();
+  return (
+    <div className="flex flex-col gap-4">
+      <StageHeader
+        icon={
+          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M9 9v6M12 5v14M15 9v6M3 12h3M18 12h3"/>
+          </svg>
+        }
+        title="無音カット"
+        desc="長い沈黙を短縮してテンポを改善"
+        enabledKey="silence_trim_enabled"
+      />
+      <div className="tg-grp">
+        <GrpHeader>検出条件</GrpHeader>
+        <Row
+          label="無音判定閾値"
+          hint="この音量以下を無音とみなす"
+          right={
+            <SliderRow
+              id="silence-threshold" min={-50} max={-20} step={1}
+              value={config.silence_threshold_db}
+              onChange={v => updateConfig({ silence_threshold_db: v })}
+              valueLabel={`${config.silence_threshold_db} dB`}
+            />
+          }
+        />
+        <Row
+          label="最小無音時間"
+          hint="この秒数以上続く無音をカット対象にする"
+          right={
+            <SliderRow
+              id="silence-min-duration" min={0.5} max={10} step={0.5}
+              value={config.silence_min_duration}
+              onChange={v => updateConfig({ silence_min_duration: v })}
+              valueLabel={`${config.silence_min_duration.toFixed(1)} 秒`}
+            />
+          }
+        />
+        <Row
+          label="カット後の長さ"
+          hint="無音を何秒に詰めるか"
+          right={
+            <SliderRow
+              id="silence-target-duration" min={0.1} max={3} step={0.1}
+              value={config.silence_target_duration}
+              onChange={v => updateConfig({ silence_target_duration: v })}
+              valueLabel={`${config.silence_target_duration.toFixed(1)} 秒`}
+            />
+          }
+        />
+      </div>
+      <Notice variant="warn">
+        <strong>無音カット</strong>はミックス後に適用されます。両方の話者が無音の区間のみがカット対象になります。
+      </Notice>
+    </div>
+  );
+}
+
+function MixSection() {
+  const { config, updateConfig } = useAppStore();
+  const [bgmFile, setBgmFile]             = useState<File | null>(null);
+  const [endsceneFile, setEndsceneFile]   = useState<File | null>(null);
+  const [bgmFromCache, setBgmFromCache]   = useState(false);
   const [endsceneFromCache, setEndsceneFromCache] = useState(false);
-  const [cacheLoading, setCacheLoading] = useState(true);
-
-  // BGM URL 入力（保存済みURLを初期値として表示）
-  const [bgmUrl, setBgmUrl] = useState(config.bgm_url ?? '');
+  const [cacheLoading, setCacheLoading]   = useState(true);
+  const [bgmUrl, setBgmUrl]               = useState(config.bgm_url ?? '');
   const [bgmUrlLoading, setBgmUrlLoading] = useState(false);
-  const [bgmUrlError, setBgmUrlError] = useState<string | null>(null);
-
-  // エンドシーン URL 入力（保存済みURLを初期値として表示）
-  const [endsceneUrl, setEndsceneUrl] = useState(config.endscene_url ?? '');
+  const [bgmUrlError, setBgmUrlError]     = useState<string | null>(null);
+  const [endsceneUrl, setEndsceneUrl]     = useState(config.endscene_url ?? '');
   const [endsceneUrlLoading, setEndsceneUrlLoading] = useState(false);
-  const [endsceneUrlError, setEndsceneUrlError] = useState<string | null>(null);
+  const [endsceneUrlError, setEndsceneUrlError]     = useState<string | null>(null);
 
-  // マウント時: URL方式 or IndexedDB から自動復元
+  // 自動復元
   useEffect(() => {
     let cancelled = false;
-
     async function restoreFiles() {
       try {
-        // BGM 復元: URL方式優先 → IndexedDB
         if (config.bgm_url) {
           try {
             const res = await fetch(config.bgm_url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const buffer = await res.arrayBuffer();
             const filename = config.bgm_filename ?? extractFilename(config.bgm_url);
-            const file = new File([buffer], filename, {
-              type: res.headers.get('content-type') ?? 'audio/mpeg',
-            });
-            if (!cancelled) {
-              setBgmFile(file);
-              setBgmFromCache(true);
-              updateConfig({ bgm: file });
-            }
+            const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
+            if (!cancelled) { setBgmFile(file); setBgmFromCache(true); updateConfig({ bgm: file }); }
           } catch {
             if (!cancelled) setBgmUrlError('URLからの自動読み込みに失敗しました');
           }
         } else {
           const cached = await loadFileFromCache('bgm');
-          if (!cancelled && cached) {
-            setBgmFile(cached);
-            setBgmFromCache(true);
-            updateConfig({ bgm: cached, bgm_filename: cached.name });
-          }
+          if (!cancelled && cached) { setBgmFile(cached); setBgmFromCache(true); updateConfig({ bgm: cached, bgm_filename: cached.name }); }
         }
-
-        // エンドシーン 復元: URL方式優先 → IndexedDB
         if (config.endscene_url) {
           try {
             const res = await fetch(config.endscene_url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const buffer = await res.arrayBuffer();
             const filename = config.endscene_filename ?? extractFilename(config.endscene_url);
-            const file = new File([buffer], filename, {
-              type: res.headers.get('content-type') ?? 'audio/mpeg',
-            });
-            if (!cancelled) {
-              setEndsceneFile(file);
-              setEndsceneFromCache(true);
-              updateConfig({ endscene: file });
-            }
+            const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
+            if (!cancelled) { setEndsceneFile(file); setEndsceneFromCache(true); updateConfig({ endscene: file }); }
           } catch {
             if (!cancelled) setEndsceneUrlError('URLからの自動読み込みに失敗しました');
           }
         } else {
           const cached = await loadFileFromCache('endscene');
-          if (!cancelled && cached) {
-            setEndsceneFile(cached);
-            setEndsceneFromCache(true);
-            updateConfig({ endscene: cached, endscene_filename: cached.name });
-          }
+          if (!cancelled && cached) { setEndsceneFile(cached); setEndsceneFromCache(true); updateConfig({ endscene: cached, endscene_filename: cached.name }); }
         }
       } finally {
         if (!cancelled) setCacheLoading(false);
       }
     }
-
     restoreFiles();
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ファイル選択ハンドラ
   const handleBgmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setBgmFile(file);
-      setBgmFromCache(false);
-      updateConfig({ bgm: file, bgm_filename: file.name, bgm_url: undefined });
-      saveFileToCache('bgm', file); // IndexedDB に保存（put で上書き）
-    }
+    if (file) { setBgmFile(file); setBgmFromCache(false); updateConfig({ bgm: file, bgm_filename: file.name, bgm_url: undefined }); saveFileToCache('bgm', file); }
   };
-
   const handleEndsceneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setEndsceneFile(file);
-      setEndsceneFromCache(false);
-      updateConfig({ endscene: file, endscene_filename: file.name, endscene_url: undefined });
-      saveFileToCache('endscene', file);
-    }
+    if (file) { setEndsceneFile(file); setEndsceneFromCache(false); updateConfig({ endscene: file, endscene_filename: file.name, endscene_url: undefined }); saveFileToCache('endscene', file); }
   };
+  const handleClearBgm = () => { setBgmFile(null); setBgmFromCache(false); setBgmUrl(''); setBgmUrlError(null); updateConfig({ bgm: undefined, bgm_filename: undefined, bgm_url: undefined }); clearFileFromCache('bgm'); };
+  const handleClearEndscene = () => { setEndsceneFile(null); setEndsceneFromCache(false); setEndsceneUrl(''); setEndsceneUrlError(null); updateConfig({ endscene: undefined, endscene_filename: undefined, endscene_url: undefined }); clearFileFromCache('endscene'); };
 
-  const handleClearBgm = () => {
-    setBgmFile(null);
-    setBgmFromCache(false);
-    setBgmUrl('');
-    setBgmUrlError(null);
-    updateConfig({ bgm: undefined, bgm_filename: undefined, bgm_url: undefined });
-    clearFileFromCache('bgm');
-  };
-
-  const handleClearEndscene = () => {
-    setEndsceneFile(null);
-    setEndsceneFromCache(false);
-    setEndsceneUrl('');
-    setEndsceneUrlError(null);
-    updateConfig({ endscene: undefined, endscene_filename: undefined, endscene_url: undefined });
-    clearFileFromCache('endscene');
-  };
-
-  // URL 読み込みハンドラ
   const handleBgmUrlLoad = async () => {
     if (!bgmUrl) return;
-    setBgmUrlLoading(true);
-    setBgmUrlError(null);
+    setBgmUrlLoading(true); setBgmUrlError(null);
     const rawUrl = toRawUrl(bgmUrl);
     if (rawUrl !== bgmUrl) setBgmUrl(rawUrl);
     try {
@@ -169,24 +497,16 @@ export function ConfigPanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buffer = await res.arrayBuffer();
       const filename = extractFilename(rawUrl);
-      const file = new File([buffer], filename, {
-        type: res.headers.get('content-type') ?? 'audio/mpeg',
-      });
-      setBgmFile(file);
-      setBgmFromCache(false);
+      const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
+      setBgmFile(file); setBgmFromCache(false);
       updateConfig({ bgm: file, bgm_filename: filename, bgm_url: rawUrl });
-      clearFileFromCache('bgm'); // URL方式が優先: IndexedDB のエントリを削除
-    } catch {
-      setBgmUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
-    } finally {
-      setBgmUrlLoading(false);
-    }
+      clearFileFromCache('bgm');
+    } catch { setBgmUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）'); }
+    finally { setBgmUrlLoading(false); }
   };
-
   const handleEndsceneUrlLoad = async () => {
     if (!endsceneUrl) return;
-    setEndsceneUrlLoading(true);
-    setEndsceneUrlError(null);
+    setEndsceneUrlLoading(true); setEndsceneUrlError(null);
     const rawUrl = toRawUrl(endsceneUrl);
     if (rawUrl !== endsceneUrl) setEndsceneUrl(rawUrl);
     try {
@@ -194,599 +514,215 @@ export function ConfigPanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buffer = await res.arrayBuffer();
       const filename = extractFilename(rawUrl);
-      const file = new File([buffer], filename, {
-        type: res.headers.get('content-type') ?? 'audio/mpeg',
-      });
-      setEndsceneFile(file);
-      setEndsceneFromCache(false);
+      const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
+      setEndsceneFile(file); setEndsceneFromCache(false);
       updateConfig({ endscene: file, endscene_filename: filename, endscene_url: rawUrl });
       clearFileFromCache('endscene');
-    } catch {
-      setEndsceneUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）');
-    } finally {
-      setEndsceneUrlLoading(false);
-    }
-  };
-
-  const handleShareConfig = async () => {
-    const shareUrl = generateShareUrl(config);
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy URL:', error);
-      alert('URLのコピーに失敗しました: ' + error);
-    }
+    } catch { setEndsceneUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）'); }
+    finally { setEndsceneUrlLoading(false); }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">詳細設定</h2>
-        <button
-          onClick={handleShareConfig}
-          className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-        >
-          {copied ? '✓ コピー済み' : '設定を共有'}
-        </button>
+    <div className="flex flex-col gap-4">
+      <StageHeader
+        icon={
+          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+          </svg>
+        }
+        title="BGM・エンドシーン"
+        desc="バックグラウンドミュージックと末尾クリップの合成"
+      />
+
+      {/* BGM */}
+      <div className="tg-grp">
+        <GrpHeader>BGMファイル</GrpHeader>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!cacheLoading && !bgmFile && config.bgm_filename && (
+            <Notice variant="warn">前回: {config.bgm_filename}（再選択が必要です）</Notice>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ cursor: 'pointer' }}>
+              <span className="tg-btn" style={{ display: 'inline-flex' }}>ファイルを選択</span>
+              <input type="file" accept="audio/*" onChange={handleBgmChange} style={{ display: 'none' }} />
+            </label>
+            {(bgmFile || config.bgm_filename) && (
+              <button onClick={handleClearBgm} style={{ fontSize: 12, color: 'var(--tg-red)', cursor: 'pointer', background: 'none', border: 'none' }}>クリア</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="url" value={bgmUrl}
+              onChange={e => setBgmUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleBgmUrlLoad()}
+              placeholder="https://... (GitHub Raw, S3等)"
+              className="tg-input"
+            />
+            <button onClick={handleBgmUrlLoad} disabled={bgmUrlLoading || !bgmUrl} className="tg-btn" style={{ flexShrink: 0 }}>
+              {bgmUrlLoading ? '読込中...' : 'URLから読込'}
+            </button>
+          </div>
+          {bgmUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{bgmUrlError}</span>}
+          {bgmFile && (
+            <Notice variant="success">
+              {bgmFromCache ? `復元: ${bgmFile.name}${config.bgm_url ? ' (URL)' : ' (キャッシュ)'}` : `選択中: ${bgmFile.name}`}
+            </Notice>
+          )}
+        </div>
+        {bgmFile && (
+          <>
+            <Row
+              label="BGM音量"
+              hint="絶対音量（推奨: -44 LUFS）"
+              right={
+                <SliderRow id="bgm-volume" min={-60} max={-20} step={1}
+                  value={config.bgm_target_lufs}
+                  onChange={v => updateConfig({ bgm_target_lufs: v })}
+                  valueLabel={`${config.bgm_target_lufs} LUFS`}
+                />
+              }
+            />
+            <Row
+              label="フェードイン"
+              right={
+                <SliderRow id="bgm-fade-in" min={0} max={10} step={0.5}
+                  value={config.bgm_fade_in}
+                  onChange={v => updateConfig({ bgm_fade_in: v })}
+                  valueLabel={`${config.bgm_fade_in.toFixed(1)} 秒`}
+                />
+              }
+            />
+            <Row
+              label="フェードアウト"
+              right={
+                <SliderRow id="bgm-fade-out" min={0} max={10} step={0.5}
+                  value={config.bgm_fade_out}
+                  onChange={v => updateConfig({ bgm_fade_out: v })}
+                  valueLabel={`${config.bgm_fade_out.toFixed(1)} 秒`}
+                />
+              }
+            />
+          </>
+        )}
       </div>
 
-      <Accordion type="multiple" defaultValue={['preview', 'trim']} className="w-full">
-        {/* プレビューモード */}
-        <AccordionItem value="preview">
-          <AccordionTrigger>🚀 プレビューモード（音質比較用）</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="preview-mode">プレビューモード</Label>
-                <p className="text-xs text-gray-500">
-                  最初の{config.preview_duration}秒だけを高速処理して音質を比較
-                </p>
-              </div>
-              <Switch
-                id="preview-mode"
-                checked={config.preview_mode}
-                onCheckedChange={(checked) =>
-                  updateConfig({ preview_mode: checked })
-                }
-              />
-            </div>
-
-            {config.preview_mode && (
-              <div>
-                <Label htmlFor="preview-duration">
-                  プレビュー時間: {config.preview_duration}秒
-                </Label>
-                <p className="text-xs text-gray-500 mb-2">
-                  処理する長さ（10-60秒、推奨: 30秒）
-                </p>
-                <Slider
-                  id="preview-duration"
-                  min={10}
-                  max={60}
-                  step={5}
-                  value={[config.preview_duration]}
-                  onValueChange={([value]) =>
-                    updateConfig({ preview_duration: value })
-                  }
-                />
-              </div>
+      {/* Endscene */}
+      <div className="tg-grp">
+        <GrpHeader>エンドシーンファイル</GrpHeader>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!cacheLoading && !endsceneFile && config.endscene_filename && (
+            <Notice variant="warn">前回: {config.endscene_filename}（再選択が必要です）</Notice>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ cursor: 'pointer' }}>
+              <span className="tg-btn" style={{ display: 'inline-flex' }}>ファイルを選択</span>
+              <input type="file" accept="audio/*" onChange={handleEndsceneChange} style={{ display: 'none' }} />
+            </label>
+            {(endsceneFile || config.endscene_filename) && (
+              <button onClick={handleClearEndscene} style={{ fontSize: 12, color: 'var(--tg-red)', cursor: 'pointer', background: 'none', border: 'none' }}>クリア</button>
             )}
-
-            <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
-              💡 <strong>プレビューモード</strong>を使うと、異なるノイズ除去方式を素早く比較できます。
-              <br />各設定で処理を実行→ダウンロード→ローカル版と聴き比べ
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* 基本設定 */}
-        <AccordionItem value="trim">
-          <AccordionTrigger>基本設定（トリム）</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            <div>
-              <Label htmlFor="post-clap-cut">
-                クラップ後カット位置: {config.post_clap_cut.toFixed(1)}秒
-              </Label>
-              <p className="text-xs text-gray-500 mb-2">
-                クラップ検出後、何秒後から録音を開始するか（0秒=クラップ残す）
-              </p>
-              <Slider
-                id="post-clap-cut"
-                min={0}
-                max={2}
-                step={0.1}
-                value={[config.post_clap_cut]}
-                onValueChange={([value]) =>
-                  updateConfig({ post_clap_cut: value })
-                }
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="url" value={endsceneUrl}
+              onChange={e => setEndsceneUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEndsceneUrlLoad()}
+              placeholder="https://... (GitHub Raw, S3等)"
+              className="tg-input"
+            />
+            <button onClick={handleEndsceneUrlLoad} disabled={endsceneUrlLoading || !endsceneUrl} className="tg-btn" style={{ flexShrink: 0 }}>
+              {endsceneUrlLoading ? '読込中...' : 'URLから読込'}
+            </button>
+          </div>
+          {endsceneUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{endsceneUrlError}</span>}
+          {endsceneFile && (
+            <Notice variant="success">
+              {endsceneFromCache ? `復元: ${endsceneFile.name}${config.endscene_url ? ' (URL)' : ' (キャッシュ)'}` : `選択中: ${endsceneFile.name}`}
+            </Notice>
+          )}
+        </div>
+        {endsceneFile && (
+          <Row
+            label="クロスフェード"
+            right={
+              <SliderRow id="endscene-crossfade" min={0} max={5} step={0.5}
+                value={config.endscene_crossfade}
+                onChange={v => updateConfig({ endscene_crossfade: v })}
+                valueLabel={`${config.endscene_crossfade.toFixed(1)} 秒`}
               />
-            </div>
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-            <div>
-              <Label htmlFor="clap-threshold">
-                クラップ検出感度: {config.clap_threshold_db}dB
-              </Label>
-              <p className="text-xs text-gray-500 mb-2">
-                低いほど小さい音でも検出（推奨: -10dB）
-              </p>
-              <Slider
-                id="clap-threshold"
-                min={-20}
-                max={-5}
-                step={1}
-                value={[config.clap_threshold_db]}
-                onValueChange={([value]) =>
-                  updateConfig({ clap_threshold_db: value })
-                }
-              />
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* 音声処理 */}
-        <AccordionItem value="processing">
-          <AccordionTrigger>音声処理</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="denoise-enabled">ノイズ除去</Label>
-                <p className="text-xs text-gray-500">
-                  ホワイトノイズ・背景ノイズを除去
-                </p>
-              </div>
-              <Switch
-                id="denoise-enabled"
-                checked={config.denoise_enabled}
-                onCheckedChange={(checked) =>
-                  updateConfig({ denoise_enabled: checked })
-                }
-              />
-            </div>
-
-            {config.denoise_enabled && (
-              <>
-                <div>
-                  <Label>ノイズ除去方式</Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    音質を比較して最適な方式を選択してください
-                  </p>
-                  <div className="space-y-2">
-                    {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map((method) => (
-                      <label
-                        key={method}
-                        className="flex items-start gap-2 p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="radio"
-                          name="denoise_method"
-                          value={method}
-                          checked={config.denoise_method === method}
-                          onChange={() => updateConfig({ denoise_method: method })}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">
-                            {method === 'spectral' && 'スペクトル減算（推奨）'}
-                            {method === 'afftdn' && 'afftdn（FFTベース）'}
-                            {method === 'anlmdn' && 'anlmdn（NLMeans）'}
-                            {method === 'none' && 'なし（フィルタのみ）'}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {method === 'spectral' && 'Python版noisereduce相当。録音内の静かなフレームからノイズを学習して除去。サー音・キーン音・ファン音に最も効果的。'}
-                            {method === 'afftdn' && 'FFTベース。時間的ノイズ追跡あり。軽量で定常ノイズに効果的。'}
-                            {method === 'anlmdn' && '非局所平均ベース。高品質だが処理が重い。'}
-                            {method === 'none' && 'highpass + lowpassのみ。ノイズ除去なし。'}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {config.denoise_method !== 'none' && (
-                  <div>
-                    <Label htmlFor="noise-gate-threshold">
-                      ノイズフロア閾値: {config.noise_gate_threshold}dB
-                    </Label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      低いほど弱いノイズも除去（推奨: -50dB）
-                    </p>
-                    <Slider
-                      id="noise-gate-threshold"
-                      min={-60}
-                      max={-30}
-                      step={5}
-                      value={[config.noise_gate_threshold]}
-                      onValueChange={([value]) =>
-                        updateConfig({ noise_gate_threshold: value })
-                      }
-                    />
-                  </div>
-                )}
-              </>
-            )}
-
-            <div>
-              <Label htmlFor="target-lufs">
-                目標ラウドネス: {config.target_lufs}LUFS
-              </Label>
-              <p className="text-xs text-gray-500 mb-2">
-                ポッドキャスト標準: -16 LUFS
-              </p>
-              <Slider
-                id="target-lufs"
-                min={-20}
-                max={-12}
-                step={0.5}
-                value={[config.target_lufs]}
-                onValueChange={([value]) =>
-                  updateConfig({ target_lufs: value })
-                }
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="comp-ratio">
-                コンプレッサー比率: {config.comp_ratio}:1
-              </Label>
-              <p className="text-xs text-gray-500 mb-2">
-                大きいほど圧縮が強い（推奨: 4:1）
-              </p>
-              <Slider
-                id="comp-ratio"
-                min={2}
-                max={10}
-                step={1}
-                value={[config.comp_ratio]}
-                onValueChange={([value]) =>
-                  updateConfig({ comp_ratio: value })
-                }
-              />
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* 無音カット */}
-        <AccordionItem value="silence">
-          <AccordionTrigger>無音カット</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="silence-trim-enabled">無音カット</Label>
-                <p className="text-xs text-gray-500">
-                  長い無音区間を自動で短縮
-                </p>
-              </div>
-              <Switch
-                id="silence-trim-enabled"
-                checked={config.silence_trim_enabled}
-                onCheckedChange={(checked) =>
-                  updateConfig({ silence_trim_enabled: checked })
-                }
-              />
-            </div>
-
-            {config.silence_trim_enabled && (
-              <>
-                <div>
-                  <Label htmlFor="silence-threshold">
-                    無音判定レベル: {config.silence_threshold_db}dB
-                  </Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    この音量以下を無音とみなす（低いほど厳密）
-                  </p>
-                  <Slider
-                    id="silence-threshold"
-                    min={-50}
-                    max={-20}
-                    step={1}
-                    value={[config.silence_threshold_db]}
-                    onValueChange={([value]) =>
-                      updateConfig({ silence_threshold_db: value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="silence-min-duration">
-                    カット対象の最小無音時間: {config.silence_min_duration.toFixed(1)}秒
-                  </Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    この秒数以上続く無音をカット対象にする
-                  </p>
-                  <Slider
-                    id="silence-min-duration"
-                    min={0.5}
-                    max={10}
-                    step={0.5}
-                    value={[config.silence_min_duration]}
-                    onValueChange={([value]) =>
-                      updateConfig({ silence_min_duration: value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="silence-target-duration">
-                    カット後の無音の長さ: {config.silence_target_duration.toFixed(1)}秒
-                  </Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    無音を何秒に詰めるか
-                  </p>
-                  <Slider
-                    id="silence-target-duration"
-                    min={0.1}
-                    max={3}
-                    step={0.1}
-                    value={[config.silence_target_duration]}
-                    onValueChange={([value]) =>
-                      updateConfig({ silence_target_duration: value })
-                    }
-                  />
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
-                  <strong>無音カット</strong>はミックス後に適用されます。
-                  両方の話者が無音の区間のみがカット対象になります。
-                </div>
-              </>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* ミックス */}
-        <AccordionItem value="mix">
-          <AccordionTrigger>ミックス（BGM・エンドシーン）</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            {/* BGM */}
-            <div>
-              <Label htmlFor="bgm-file">BGMファイル</Label>
-              <p className="text-xs text-gray-500 mb-2">
-                自動ループ・フェード処理されます
-              </p>
-
-              {/* amber 警告: キャッシュ読み込み完了後のみ表示 */}
-              {!cacheLoading && !bgmFile && config.bgm_filename && (
-                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
-                  前回: {config.bgm_filename}（再選択が必要です）
-                </p>
-              )}
-
-              {/* ファイル選択 */}
-              <div className="flex items-center gap-2">
-                <input
-                  id="bgm-file"
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleBgmChange}
-                  className="text-sm"
-                />
-                {(bgmFile || config.bgm_filename) && (
-                  <button
-                    onClick={handleClearBgm}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    クリア
-                  </button>
-                )}
-              </div>
-
-              {/* URL 入力 */}
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="url"
-                  value={bgmUrl}
-                  onChange={(e) => setBgmUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleBgmUrlLoad()}
-                  placeholder="https://... (GitHub Raw, S3等)"
-                  className="flex-1 text-sm border rounded px-2 py-1"
-                />
+function ExportSection() {
+  const { config, updateConfig } = useAppStore();
+  return (
+    <div className="flex flex-col gap-4">
+      <StageHeader
+        icon={
+          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 3v13M5 10l7 7 7-7"/><path d="M4 20h16"/>
+          </svg>
+        }
+        title="エクスポート"
+        desc="出力フォーマットとビットレートの設定"
+      />
+      <div className="tg-grp">
+        <GrpHeader>フォーマット</GrpHeader>
+        <Row
+          label="出力形式"
+          right={
+            <div className="tg-seg">
+              {(['mp3', 'wav'] as const).map(fmt => (
                 <button
-                  onClick={handleBgmUrlLoad}
-                  disabled={bgmUrlLoading || !bgmUrl}
-                  className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+                  key={fmt}
+                  className={`tg-seg-btn${config.output_format === fmt ? ' active' : ''}`}
+                  onClick={() => updateConfig({ output_format: fmt })}
                 >
-                  {bgmUrlLoading ? '読込中...' : 'URLから読込'}
+                  {fmt.toUpperCase()}
                 </button>
-              </div>
-              {bgmUrlError && (
-                <p className="text-xs text-red-600 mt-1">{bgmUrlError}</p>
-              )}
-
-              {/* ステータス */}
-              {bgmFile && (
-                <p className="text-xs text-green-600 mt-1">
-                  ✓ {bgmFromCache
-                    ? `復元: ${bgmFile.name}${config.bgm_url ? ' (URL)' : ' (キャッシュ)'}`
-                    : `選択中: ${bgmFile.name}`}
-                </p>
-              )}
+              ))}
             </div>
-
-            {bgmFile && (
-              <>
-                <div>
-                  <Label htmlFor="bgm-volume">
-                    BGM音量: {config.bgm_target_lufs} LUFS
-                  </Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    絶対音量指定（推奨: -44 LUFS / 控えめ: -50 / 目立たせる: -36）
-                  </p>
-                  <Slider
-                    id="bgm-volume"
-                    min={-60}
-                    max={-20}
-                    step={1}
-                    value={[config.bgm_target_lufs]}
-                    onValueChange={([value]) =>
-                      updateConfig({ bgm_target_lufs: value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="bgm-fade-in">
-                    BGMフェードイン: {config.bgm_fade_in.toFixed(1)}秒
-                  </Label>
-                  <Slider
-                    id="bgm-fade-in"
-                    min={0}
-                    max={10}
-                    step={0.5}
-                    value={[config.bgm_fade_in]}
-                    onValueChange={([value]) =>
-                      updateConfig({ bgm_fade_in: value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="bgm-fade-out">
-                    BGMフェードアウト: {config.bgm_fade_out.toFixed(1)}秒
-                  </Label>
-                  <Slider
-                    id="bgm-fade-out"
-                    min={0}
-                    max={10}
-                    step={0.5}
-                    value={[config.bgm_fade_out]}
-                    onValueChange={([value]) =>
-                      updateConfig({ bgm_fade_out: value })
-                    }
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Endscene */}
-            <div className="pt-4 border-t">
-              <Label htmlFor="endscene-file">エンドシーンファイル</Label>
-              <p className="text-xs text-gray-500 mb-2">
-                クロスフェードで接続されます
-              </p>
-
-              {/* amber 警告 */}
-              {!cacheLoading && !endsceneFile && config.endscene_filename && (
-                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
-                  前回: {config.endscene_filename}（再選択が必要です）
-                </p>
-              )}
-
-              {/* ファイル選択 */}
-              <div className="flex items-center gap-2">
-                <input
-                  id="endscene-file"
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleEndsceneChange}
-                  className="text-sm"
-                />
-                {(endsceneFile || config.endscene_filename) && (
+          }
+        />
+        {config.output_format === 'mp3' && (
+          <Row
+            label="ビットレート"
+            right={
+              <div className="tg-seg">
+                {(['128k', '192k', '256k', '320k'] as const).map(br => (
                   <button
-                    onClick={handleClearEndscene}
-                    className="text-xs text-red-600 hover:underline"
+                    key={br}
+                    className={`tg-seg-btn${config.mp3_bitrate === br ? ' active' : ''}`}
+                    onClick={() => updateConfig({ mp3_bitrate: br })}
                   >
-                    クリア
+                    {br}
                   </button>
-                )}
+                ))}
               </div>
+            }
+          />
+        )}
+      </div>
+      <Notice>192kbps はポッドキャストの標準ビットレートです。配信プラットフォームが圧縮するため、320kbps の効果は限定的です。</Notice>
+    </div>
+  );
+}
 
-              {/* URL 入力 */}
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="url"
-                  value={endsceneUrl}
-                  onChange={(e) => setEndsceneUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleEndsceneUrlLoad()}
-                  placeholder="https://... (GitHub Raw, S3等)"
-                  className="flex-1 text-sm border rounded px-2 py-1"
-                />
-                <button
-                  onClick={handleEndsceneUrlLoad}
-                  disabled={endsceneUrlLoading || !endsceneUrl}
-                  className="text-sm px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
-                >
-                  {endsceneUrlLoading ? '読込中...' : 'URLから読込'}
-                </button>
-              </div>
-              {endsceneUrlError && (
-                <p className="text-xs text-red-600 mt-1">{endsceneUrlError}</p>
-              )}
-
-              {/* ステータス */}
-              {endsceneFile && (
-                <p className="text-xs text-green-600 mt-1">
-                  ✓ {endsceneFromCache
-                    ? `復元: ${endsceneFile.name}${config.endscene_url ? ' (URL)' : ' (キャッシュ)'}`
-                    : `選択中: ${endsceneFile.name}`}
-                </p>
-              )}
-            </div>
-
-            {endsceneFile && (
-              <div>
-                <Label htmlFor="endscene-crossfade">
-                  クロスフェード: {config.endscene_crossfade.toFixed(1)}秒
-                </Label>
-                <Slider
-                  id="endscene-crossfade"
-                  min={0}
-                  max={5}
-                  step={0.5}
-                  value={[config.endscene_crossfade]}
-                  onValueChange={([value]) =>
-                    updateConfig({ endscene_crossfade: value })
-                  }
-                />
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* エクスポート */}
-        <AccordionItem value="export">
-          <AccordionTrigger>エクスポート設定</AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-4">
-            <div>
-              <Label htmlFor="output-format">出力フォーマット</Label>
-              <select
-                id="output-format"
-                value={config.output_format}
-                onChange={(e) =>
-                  updateConfig({
-                    output_format: e.target.value as 'mp3' | 'wav',
-                  })
-                }
-                className="w-full mt-2 px-3 py-2 border rounded-md"
-              >
-                <option value="mp3">MP3</option>
-                <option value="wav">WAV</option>
-              </select>
-            </div>
-
-            {config.output_format === 'mp3' && (
-              <div>
-                <Label htmlFor="mp3-bitrate">MP3ビットレート</Label>
-                <select
-                  id="mp3-bitrate"
-                  value={config.mp3_bitrate}
-                  onChange={(e) =>
-                    updateConfig({ mp3_bitrate: e.target.value })
-                  }
-                  className="w-full mt-2 px-3 py-2 border rounded-md"
-                >
-                  <option value="128k">128kbps</option>
-                  <option value="192k">192kbps（推奨）</option>
-                  <option value="256k">256kbps</option>
-                  <option value="320k">320kbps</option>
-                </select>
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+// ── Main export ────────────────────────────────────────────────
+export function ConfigPanel({ activeSection }: ConfigPanelProps) {
+  return (
+    <div className="p-6">
+      {activeSection === 'preview'    && <PreviewSection />}
+      {activeSection === 'trim'       && <TrimSection />}
+      {activeSection === 'processing' && <ProcessingSection />}
+      {activeSection === 'silence'    && <SilenceSection />}
+      {activeSection === 'mix'        && <MixSection />}
+      {activeSection === 'export'     && <ExportSection />}
     </div>
   );
 }

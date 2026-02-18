@@ -2,6 +2,225 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* ── macOS Tahoe / Liquid Glass design tokens ─────────────────── */
+:root {
+  /* Liquid Glass (dark) */
+  --tg-bg:          rgba(10, 10, 16, 0.60);
+  --tg-sidebar:     rgba(0,   0,  8, 0.46);
+  --tg-panel:       rgba(255,255,255,0.05);
+  --tg-border:      rgba(255,255,255,0.10);
+  --tg-edge:        rgba(255,255,255,0.18);   /* top specular */
+  --tg-ctrl:        rgba(255,255,255,0.07);
+  --tg-ctrl-h:      rgba(255,255,255,0.12);
+  --tg-blur:        blur(36px) saturate(1.9);
+  --tg-blur-sm:     blur(20px) saturate(1.7);
+
+  /* Text */
+  --tg-t1: rgba(255,255,255,0.90);
+  --tg-t2: rgba(255,255,255,0.55);
+  --tg-t3: rgba(255,255,255,0.28);
+  --tg-t4: rgba(255,255,255,0.11);
+
+  /* System accent */
+  --tg-accent:  #0A84FF;
+  --tg-green:   #30D158;
+  --tg-orange:  #FF9F0A;
+  --tg-red:     #FF453A;
+}
+
+/* ── Liquid Glass utilities ───────────────────────────────────── */
+
+/* Full-page gradient wallpaper */
+.tg-root {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 25%, rgba(100,30,220,0.45) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 85% 20%, rgba(0,80,220,0.40) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 70% at 75% 85%, rgba(0,180,120,0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 30% 80%, rgba(180,30,100,0.22) 0%, transparent 55%),
+    linear-gradient(145deg, #06050f 0%, #0c0a20 40%, #060e18 100%);
+  background-attachment: fixed;
+  font-family: -apple-system, "Helvetica Neue", sans-serif;
+}
+
+/* Main glass window */
+.tg-window {
+  background: var(--tg-bg);
+  backdrop-filter: var(--tg-blur);
+  -webkit-backdrop-filter: var(--tg-blur);
+  border: 1px solid var(--tg-border);
+  box-shadow:
+    inset 0 1px 0 var(--tg-edge),
+    inset 0 -1px 0 rgba(0,0,0,0.3),
+    0 0 0 0.5px rgba(0,0,0,0.6),
+    0 40px 120px rgba(0,0,0,0.85),
+    0 12px 40px rgba(0,0,0,0.55);
+}
+
+/* Sidebar glass */
+.tg-sidebar {
+  background: var(--tg-sidebar);
+  backdrop-filter: var(--tg-blur-sm);
+  -webkit-backdrop-filter: var(--tg-blur-sm);
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Settings group card */
+.tg-grp {
+  background: var(--tg-panel);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.25);
+}
+
+/* Capsule glass button */
+.tg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tg-t1);
+  background: var(--tg-ctrl);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.3);
+  user-select: none;
+  white-space: nowrap;
+}
+.tg-btn:hover {
+  background: var(--tg-ctrl-h);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 12px rgba(0,0,0,0.4);
+}
+
+/* Primary capsule button */
+.tg-btn-primary {
+  background: linear-gradient(180deg, rgba(10,148,255,0.95), rgba(0,105,220,0.95));
+  border-color: rgba(255,255,255,0.18);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    0 0 0 0.5px rgba(0,70,160,0.5),
+    0 4px 16px rgba(0,90,200,0.5),
+    0 1px 4px rgba(0,0,0,0.4);
+}
+.tg-btn-primary:hover {
+  background: linear-gradient(180deg, rgba(20,158,255,0.98), rgba(10,115,230,0.98));
+}
+.tg-btn-primary:disabled {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.08);
+  color: var(--tg-t3);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Nav row */
+.tg-nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  margin: 1px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+.tg-nav:hover { background: rgba(255,255,255,0.06); }
+.tg-nav.active {
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.13);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.25);
+}
+
+/* Settings row */
+.tg-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 16px;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  min-height: 44px;
+}
+.tg-row:last-child { border-bottom: none; }
+
+/* Notice box */
+.tg-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 13px;
+  background: rgba(10,132,255,0.07);
+  border: 1px solid rgba(10,132,255,0.18);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--tg-t2);
+  line-height: 1.55;
+}
+.tg-notice.warn {
+  background: rgba(255,159,10,0.07);
+  border-color: rgba(255,159,10,0.20);
+}
+.tg-notice.success {
+  background: rgba(48,209,88,0.07);
+  border-color: rgba(48,209,88,0.20);
+}
+
+/* Glass text input */
+.tg-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 13px;
+  color: var(--tg-t1);
+  font-family: -apple-system, "Helvetica Neue", sans-serif;
+  transition: border-color 0.14s;
+  outline: none;
+}
+.tg-input:focus { border-color: rgba(10,132,255,0.5); background: rgba(255,255,255,0.08); }
+.tg-input::placeholder { color: var(--tg-t3); }
+
+/* Capsule segmented control */
+.tg-seg {
+  display: flex;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 100px;
+  padding: 2px;
+  gap: 1px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.tg-seg-btn {
+  padding: 3px 13px;
+  font-size: 12px;
+  color: var(--tg-t2);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.14s;
+}
+.tg-seg-btn.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--tg-t1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+/* Status dot */
+.tg-dot { width: 6px; height: 6px; border-radius: 50%; }
+.tg-dot-on  { background: var(--tg-green); box-shadow: 0 0 6px rgba(48,209,88,.5); }
+.tg-dot-off { background: var(--tg-t4); }
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
