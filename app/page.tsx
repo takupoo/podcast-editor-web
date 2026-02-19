@@ -330,8 +330,12 @@ export default function Home() {
 
           {/* Share config */}
           <button className="tg-btn" onClick={handleShareConfig}>
-            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M11 2a2 2 0 0 1 2 2 2 2 0 0 1-2 2 2 2 0 0 1-1.73-1H6.5A2 2 0 0 1 5 6.5a2 2 0 0 1-1 1.73V10.5A2 2 0 0 1 5 12.27 2 2 0 0 1 6.5 14H9.27A2 2 0 0 1 11 13a2 2 0 0 1 2 2 2 2 0 0 1-2 2 2 2 0 0 1-1.73-1H6.5A2 2 0 0 1 4 14a2 2 0 0 1-2-1.73V8.23A2 2 0 0 1 1 6.5 2 2 0 0 1 3 4.5a2 2 0 0 1 1 .27V4a2 2 0 0 1 1.73-2H9.27A2 2 0 0 1 11 1z"/></svg>
-            {copied ? '✓ コピー済み' : '設定共有'}
+            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6.5 8.5L9.5 5.5M6.5 5.5L9.5 8.5"/>
+              <path d="M9 4H11C12.1 4 13 4.9 13 6V6C13 7.1 12.1 8 11 8H11"/>
+              <path d="M7 8H5C3.9 8 3 8.9 3 10V10C3 11.1 3.9 12 5 12H7"/>
+            </svg>
+            {copied ? '✓ コピー済み' : 'URL'}
           </button>
 
           {/* Reset */}
@@ -410,26 +414,51 @@ export default function Home() {
         <div
           className="flex items-center px-4 gap-3 shrink-0"
           style={{
-            height: 24,
+            height: processing ? 32 : 24,
             borderTop: '1px solid rgba(255,255,255,0.06)',
             background: 'rgba(0,0,0,0.15)',
+            transition: 'height 0.2s',
           }}
         >
-          <div style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: result ? 'var(--tg-green)' : processing ? 'var(--tg-accent)' : 'var(--tg-green)',
-            boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : processing ? '0 0 6px rgba(10,132,255,.5)' : '0 0 6px rgba(48,209,88,.3)',
-          }} />
-          <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
-          {processing && progress && (
-            <div style={{ width: 120, height: 2, background: 'rgba(255,255,255,0.08)', borderRadius: 1 }}>
-              <div style={{ height: '100%', width: `${progress.percent}%`, background: 'var(--tg-accent)', borderRadius: 1, transition: 'width 0.5s' }} />
-            </div>
+          {!processing ? (
+            <>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: result ? 'var(--tg-green)' : 'var(--tg-green)',
+                boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : '0 0 6px rgba(48,209,88,.3)',
+              }} />
+              <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
+              {notifPerm === 'granted' && (
+                <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>🔔 完了時に通知</span>
+              )}
+              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: notifPerm === 'granted' ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
+            </>
+          ) : (
+            <>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: 'var(--tg-accent)',
+                boxShadow: '0 0 6px rgba(10,132,255,.5)',
+              }} />
+              <span style={{ fontSize: 11, color: 'var(--tg-t1)', fontWeight: 500 }}>{progress?.stage || '処理中'}</span>
+              <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', maxWidth: 200 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${progress?.percent || 0}%`,
+                  background: 'linear-gradient(90deg, var(--tg-accent), var(--tg-green))',
+                  borderRadius: 2,
+                  transition: 'width 0.3s ease-out',
+                  boxShadow: '0 0 8px rgba(10,132,255,0.4)',
+                }} />
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--tg-accent)', fontWeight: 600, minWidth: 36, textAlign: 'right' }}>
+                {progress?.percent || 0}%
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                {progress?.message || '処理中...'}
+              </span>
+            </>
           )}
-          {notifPerm === 'granted' && (
-            <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>🔔 完了時に通知</span>
-          )}
-          <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: notifPerm === 'granted' ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
         </div>
       </div>
     </div>
