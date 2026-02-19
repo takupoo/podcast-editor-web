@@ -176,6 +176,7 @@ export default function Home() {
     try {
       const output = await processPodcast(files[0], files[1], config, p => setProgress(p));
       setResult(output);
+      setActiveSection('source'); // 処理完了時に「音声ファイル」セクションに戻る
       notify('処理完了！', 'ポッドキャストの編集が完了しました。');
     } catch (error) {
       setProgress({ stage: 'error', percent: 0, message: `エラーが発生しました: ${error}` });
@@ -193,6 +194,18 @@ export default function Home() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { alert('URLのコピーに失敗しました'); }
+  };
+
+  const handleDownload = () => {
+    if (!result) return;
+    const url = URL.createObjectURL(result);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const canProcess = files.length >= 2 && !processing;
@@ -296,13 +309,13 @@ export default function Home() {
                 className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
                 onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
               >
-                全体処理
+                通常編集
               </button>
               <button
                 className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
                 onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
               >
-                プレビュー
+                ショートプレビュー確認
               </button>
             </div>
           )}
@@ -428,10 +441,42 @@ export default function Home() {
                 boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : '0 0 6px rgba(48,209,88,.3)',
               }} />
               <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
-              {notifPerm === 'granted' && (
+              {result && (
+                <button
+                  onClick={handleDownload}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--tg-green)',
+                    background: 'rgba(48,209,88,0.15)',
+                    border: '1px solid rgba(48,209,88,0.3)',
+                    borderRadius: 6,
+                    padding: '3px 10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(48,209,88,0.25)';
+                    e.currentTarget.style.borderColor = 'rgba(48,209,88,0.5)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(48,209,88,0.15)';
+                    e.currentTarget.style.borderColor = 'rgba(48,209,88,0.3)';
+                  }}
+                >
+                  <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
+                  </svg>
+                  ダウンロード
+                </button>
+              )}
+              {notifPerm === 'granted' && !result && (
                 <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>🔔 完了時に通知</span>
               )}
-              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: notifPerm === 'granted' ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
+              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: (notifPerm === 'granted' && !result) ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
             </>
           ) : (
             <>
