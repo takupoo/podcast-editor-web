@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Editor – Adobe Spectrum</title>
+  <style>
+    /* ── Adobe Spectrum Design Tokens ──────────────────────────── */
+    :root {
+      /* Typography */
+      --spectrum-font-family: 'Adobe Clean', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --spectrum-code-font-family: 'Source Code Pro', 'Courier New', monospace;
+
+      /* Font Sizes (Medium Scale - Desktop) */
+      --spectrum-font-size-50: 11px;
+      --spectrum-font-size-75: 12px;
+      --spectrum-font-size-100: 14px;
+      --spectrum-font-size-200: 16px;
+      --spectrum-font-size-300: 18px;
+      --spectrum-font-size-400: 20px;
+      --spectrum-font-size-500: 22px;
+      --spectrum-font-size-600: 25px;
+      --spectrum-font-size-700: 28px;
+      --spectrum-font-size-900: 36px;
+
+      /* Font Weights */
+      --spectrum-font-weight-300: 300;
+      --spectrum-font-weight-400: 400;
+      --spectrum-font-weight-700: 700;
+      --spectrum-font-weight-900: 900;
+
+      /* Line Heights */
+      --spectrum-line-height-heading: 1.3;
+      --spectrum-line-height-body: 1.5;
+
+      /* Spacing (Static - all platforms) */
+      --spectrum-spacing-50: 2px;
+      --spectrum-spacing-75: 4px;
+      --spectrum-spacing-100: 8px;
+      --spectrum-spacing-200: 12px;
+      --spectrum-spacing-300: 16px;
+      --spectrum-spacing-400: 24px;
+      --spectrum-spacing-500: 32px;
+      --spectrum-spacing-600: 40px;
+      --spectrum-spacing-700: 48px;
+      --spectrum-spacing-800: 64px;
+
+      /* Colors - Light Theme Gray Scale */
+      --spectrum-gray-50: #ffffff;
+      --spectrum-gray-75: #fafafa;
+      --spectrum-gray-100: #f5f5f5;
+      --spectrum-gray-200: #ebebeb;
+      --spectrum-gray-300: #e1e1e1;
+      --spectrum-gray-400: #cacaca;
+      --spectrum-gray-500: #b3b3b3;
+      --spectrum-gray-600: #8e8e8e;
+      --spectrum-gray-700: #707070;
+      --spectrum-gray-800: #505050;
+      --spectrum-gray-900: #323232;
+
+      /* Semantic Colors */
+      --spectrum-blue-600: #0078d4;
+      --spectrum-blue-700: #0066b8;
+      --spectrum-blue-800: #004a9e;
+      --spectrum-red-600: #d7373f;
+      --spectrum-green-600: #2d9d78;
+
+      --spectrum-background-base-color: var(--spectrum-gray-100);
+      --spectrum-background-layer-1: var(--spectrum-gray-50);
+      --spectrum-text-primary-color: var(--spectrum-gray-900);
+      --spectrum-text-secondary-color: var(--spectrum-gray-700);
+      --spectrum-border-color: var(--spectrum-gray-300);
+      --spectrum-border-color-dark: var(--spectrum-gray-400);
+      --spectrum-focus-indicator-color: var(--spectrum-blue-600);
+      --spectrum-disabled-background-color: var(--spectrum-gray-200);
+      --spectrum-disabled-content-color: var(--spectrum-gray-500);
+
+      /* Shapes (Border Radius) */
+      --spectrum-border-radius-small: 2px;
+      --spectrum-border-radius-default: 4px;
+
+      /* Border Widths */
+      --spectrum-border-width-thin: 1px;
+      --spectrum-border-width-thick: 2px;
+
+      /* Component Heights */
+      --spectrum-component-height-75: 24px;
+      --spectrum-component-height-100: 32px;
+      --spectrum-component-height-200: 40px;
+
+      /* Elevation (Shadow) */
+      --spectrum-drop-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+      --spectrum-drop-shadow-md: 0 1px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--spectrum-font-family);
+      font-size: var(--spectrum-font-size-200);
+      line-height: var(--spectrum-line-height-body);
+      color: var(--spectrum-text-primary-color);
+      background: var(--spectrum-background-base-color);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Header ──────────────────────────────────────────── */
+    .spectrum-header {
+      height: 64px;
+      background: var(--spectrum-gray-50);
+      border-bottom: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 var(--spectrum-spacing-400);
+      gap: var(--spectrum-spacing-300);
+      flex-shrink: 0;
+    }
+    .spectrum-header-title {
+      font-size: var(--spectrum-font-size-400);
+      font-weight: var(--spectrum-font-weight-700);
+      color: var(--spectrum-text-primary-color);
+    }
+
+    /* Icon Button */
+    .spectrum-action-button {
+      width: var(--spectrum-component-height-100);
+      height: var(--spectrum-component-height-100);
+      border-radius: var(--spectrum-border-radius-default);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+      background: var(--spectrum-gray-50);
+      color: var(--spectrum-text-secondary-color);
+      transition: all 0.13s ease-in-out;
+    }
+    .spectrum-action-button:hover {
+      background: var(--spectrum-gray-100);
+      border-color: var(--spectrum-border-color-dark);
+    }
+    .spectrum-action-button:focus {
+      outline: var(--spectrum-border-width-thick) solid var(--spectrum-focus-indicator-color);
+      outline-offset: 2px;
+    }
+
+    /* ── Body ────────────────────────────────────────────────── */
+    .spectrum-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Side Navigation ─────────────────────────────────────── */
+    .spectrum-side-nav {
+      width: 256px;
+      background: var(--spectrum-gray-75);
+      border-right: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+      padding: var(--spectrum-spacing-400) 0;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    .spectrum-side-nav-item {
+      height: var(--spectrum-component-height-100);
+      padding: 0 var(--spectrum-spacing-300);
+      display: flex;
+      align-items: center;
+      gap: var(--spectrum-spacing-200);
+      cursor: pointer;
+      font-size: var(--spectrum-font-size-100);
+      font-weight: var(--spectrum-font-weight-400);
+      color: var(--spectrum-text-primary-color);
+      transition: background 0.13s;
+      position: relative;
+    }
+    .spectrum-side-nav-item svg {
+      width: 20px; height: 20px;
+      color: var(--spectrum-text-secondary-color);
+    }
+    .spectrum-side-nav-item:hover {
+      background: rgba(0,0,0,0.04);
+    }
+    .spectrum-side-nav-item.selected {
+      background: var(--spectrum-gray-200);
+      font-weight: var(--spectrum-font-weight-700);
+    }
+    .spectrum-side-nav-item.selected::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--spectrum-blue-600);
+    }
+    .spectrum-side-nav-item.selected svg {
+      color: var(--spectrum-blue-600);
+    }
+
+    .spectrum-side-nav-divider {
+      height: 1px;
+      background: var(--spectrum-border-color);
+      margin: var(--spectrum-spacing-200) var(--spectrum-spacing-300);
+    }
+
+    /* ── Main Content ────────────────────────────────────────── */
+    .spectrum-main {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spectrum-spacing-600);
+      background: var(--spectrum-background-layer-1);
+    }
+    .spectrum-main::-webkit-scrollbar { width: 10px; }
+    .spectrum-main::-webkit-scrollbar-track { background: var(--spectrum-gray-200); }
+    .spectrum-main::-webkit-scrollbar-thumb { background: var(--spectrum-gray-400); border-radius: 5px; }
+
+    .spectrum-container {
+      max-width: 1024px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spectrum-spacing-500);
+    }
+
+    /* ── Typography ──────────────────────────────────────────── */
+    .spectrum-heading-xl {
+      font-size: var(--spectrum-font-size-900);
+      font-weight: var(--spectrum-font-weight-900);
+      line-height: var(--spectrum-line-height-heading);
+      color: var(--spectrum-text-primary-color);
+    }
+    .spectrum-heading-lg {
+      font-size: var(--spectrum-font-size-700);
+      font-weight: var(--spectrum-font-weight-700);
+      line-height: var(--spectrum-line-height-heading);
+    }
+    .spectrum-heading-md {
+      font-size: var(--spectrum-font-size-500);
+      font-weight: var(--spectrum-font-weight-700);
+      line-height: var(--spectrum-line-height-heading);
+    }
+    .spectrum-heading-sm {
+      font-size: var(--spectrum-font-size-300);
+      font-weight: var(--spectrum-font-weight-700);
+    }
+    .spectrum-body {
+      font-size: var(--spectrum-font-size-200);
+      font-weight: var(--spectrum-font-weight-400);
+      line-height: var(--spectrum-line-height-body);
+      color: var(--spectrum-text-primary-color);
+    }
+    .spectrum-detail {
+      font-size: var(--spectrum-font-size-100);
+      font-weight: var(--spectrum-font-weight-400);
+      color: var(--spectrum-text-secondary-color);
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .spectrum-card {
+      background: var(--spectrum-gray-50);
+      border: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+      border-radius: var(--spectrum-border-radius-default);
+      overflow: hidden;
+    }
+    .spectrum-card-header {
+      padding: var(--spectrum-spacing-400);
+      border-bottom: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+    }
+    .spectrum-card-content {
+      padding: var(--spectrum-spacing-400);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spectrum-spacing-400);
+    }
+
+    /* ── Button ──────────────────────────────────────────────── */
+    .spectrum-button {
+      height: var(--spectrum-component-height-100);
+      padding: 0 var(--spectrum-spacing-300);
+      border-radius: var(--spectrum-border-radius-default);
+      font-family: var(--spectrum-font-family);
+      font-size: var(--spectrum-font-size-100);
+      font-weight: var(--spectrum-font-weight-700);
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spectrum-spacing-100);
+      white-space: nowrap;
+      transition: all 0.13s ease-in-out;
+    }
+
+    /* Accent (Primary) Fill Button */
+    .spectrum-button-accent {
+      background: var(--spectrum-blue-600);
+      color: white;
+    }
+    .spectrum-button-accent:hover {
+      background: var(--spectrum-blue-700);
+    }
+    .spectrum-button-accent:active {
+      background: var(--spectrum-blue-800);
+    }
+    .spectrum-button-accent:focus {
+      outline: var(--spectrum-border-width-thick) solid var(--spectrum-focus-indicator-color);
+      outline-offset: 2px;
+    }
+
+    /* Secondary Fill Button */
+    .spectrum-button-secondary {
+      background: var(--spectrum-gray-200);
+      color: var(--spectrum-text-primary-color);
+    }
+    .spectrum-button-secondary:hover {
+      background: var(--spectrum-gray-300);
+    }
+
+    /* Outline Button */
+    .spectrum-button-outline {
+      background: transparent;
+      border: var(--spectrum-border-width-thick) solid var(--spectrum-gray-700);
+      color: var(--spectrum-text-primary-color);
+    }
+    .spectrum-button-outline:hover {
+      background: var(--spectrum-gray-100);
+      border-color: var(--spectrum-gray-900);
+    }
+
+    /* CTA (Call to Action) Button - larger */
+    .spectrum-button-cta {
+      height: var(--spectrum-component-height-200);
+      padding: 0 var(--spectrum-spacing-400);
+      font-size: var(--spectrum-font-size-200);
+    }
+
+    /* ── Drop Zone ───────────────────────────────────────────── */
+    .spectrum-dropzone {
+      border: var(--spectrum-border-width-thick) dashed var(--spectrum-gray-400);
+      border-radius: var(--spectrum-border-radius-default);
+      padding: var(--spectrum-spacing-600);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.13s;
+      background: var(--spectrum-gray-50);
+    }
+    .spectrum-dropzone:hover {
+      border-color: var(--spectrum-gray-700);
+      background: var(--spectrum-gray-75);
+    }
+    .spectrum-dropzone.active {
+      border-color: var(--spectrum-blue-600);
+      background: rgba(0, 120, 212, 0.05);
+    }
+    .spectrum-dropzone.selected {
+      border-style: solid;
+      border-color: var(--spectrum-green-600);
+      background: rgba(45, 157, 120, 0.06);
+    }
+
+    /* ── Text Field ──────────────────────────────────────────── */
+    .spectrum-textfield {
+      position: relative;
+    }
+    .spectrum-textfield input,
+    .spectrum-textfield textarea {
+      width: 100%;
+      height: var(--spectrum-component-height-100);
+      padding: 0 var(--spectrum-spacing-200);
+      border: var(--spectrum-border-width-thin) solid var(--spectrum-gray-400);
+      border-radius: var(--spectrum-border-radius-default);
+      font-family: var(--spectrum-font-family);
+      font-size: var(--spectrum-font-size-100);
+      color: var(--spectrum-text-primary-color);
+      background: var(--spectrum-gray-50);
+      transition: border-color 0.13s;
+    }
+    .spectrum-textfield textarea {
+      height: auto;
+      padding: var(--spectrum-spacing-100) var(--spectrum-spacing-200);
+    }
+    .spectrum-textfield input:hover,
+    .spectrum-textfield textarea:hover {
+      border-color: var(--spectrum-gray-600);
+    }
+    .spectrum-textfield input:focus,
+    .spectrum-textfield textarea:focus {
+      outline: none;
+      border-color: var(--spectrum-blue-600);
+      border-width: var(--spectrum-border-width-thick);
+      padding: 0 calc(var(--spectrum-spacing-200) - 1px);
+    }
+    .spectrum-textfield textarea:focus {
+      padding: calc(var(--spectrum-spacing-100) - 1px) calc(var(--spectrum-spacing-200) - 1px);
+    }
+
+    /* ── Slider ──────────────────────────────────────────────── */
+    .spectrum-slider-row {
+      display: flex;
+      align-items: center;
+      gap: var(--spectrum-spacing-200);
+    }
+    .spectrum-slider-label {
+      font-size: var(--spectrum-font-size-100);
+      font-weight: var(--spectrum-font-weight-700);
+      color: var(--spectrum-text-primary-color);
+      min-width: 180px;
+    }
+    .spectrum-slider-track {
+      flex: 1;
+      height: 6px;
+      background: var(--spectrum-gray-300);
+      border-radius: 3px;
+      position: relative;
+    }
+    .spectrum-slider-fill {
+      height: 100%;
+      background: var(--spectrum-gray-700);
+      border-radius: 3px;
+      position: relative;
+    }
+    .spectrum-slider-handle {
+      width: 16px;
+      height: 16px;
+      background: var(--spectrum-gray-50);
+      border: var(--spectrum-border-width-thick) solid var(--spectrum-gray-700);
+      border-radius: 50%;
+      position: absolute;
+      right: -8px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .spectrum-slider-handle:hover {
+      border-color: var(--spectrum-gray-900);
+    }
+    .spectrum-slider-value {
+      font-size: var(--spectrum-font-size-100);
+      font-weight: var(--spectrum-font-weight-700);
+      color: var(--spectrum-blue-600);
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* ── Switch ──────────────────────────────────────────────── */
+    .spectrum-switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .spectrum-switch {
+      width: 40px;
+      height: 20px;
+      border-radius: 10px;
+      background: var(--spectrum-gray-400);
+      border: var(--spectrum-border-width-thick) solid var(--spectrum-gray-400);
+      position: relative;
+      cursor: pointer;
+      transition: all 0.13s;
+    }
+    .spectrum-switch-handle {
+      width: 12px;
+      height: 12px;
+      background: var(--spectrum-gray-50);
+      border-radius: 50%;
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      transition: all 0.13s;
+    }
+    .spectrum-switch.checked {
+      background: var(--spectrum-blue-600);
+      border-color: var(--spectrum-blue-600);
+    }
+    .spectrum-switch.checked .spectrum-switch-handle {
+      left: 22px;
+    }
+
+    /* ── Progress ────────────────────────────────────────────── */
+    .spectrum-progress-bar {
+      height: 4px;
+      background: var(--spectrum-gray-300);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .spectrum-progress-fill {
+      height: 100%;
+      background: var(--spectrum-blue-600);
+      transition: width 0.3s;
+    }
+
+    /* ── List Item ───────────────────────────────────────────── */
+    .spectrum-list-item {
+      min-height: 48px;
+      padding: var(--spectrum-spacing-200) var(--spectrum-spacing-300);
+      display: flex;
+      align-items: center;
+      gap: var(--spectrum-spacing-200);
+      border-bottom: var(--spectrum-border-width-thin) solid var(--spectrum-border-color);
+    }
+    .spectrum-list-item:last-child {
+      border-bottom: none;
+    }
+    .spectrum-list-item-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .spectrum-list-item-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="spectrum-header">
+  <button class="spectrum-action-button">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+      <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+    </svg>
+  </button>
+  <div class="spectrum-header-title">Podcast Editor</div>
+  <div style="flex:1"></div>
+  <button class="spectrum-action-button">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Body -->
+<div class="spectrum-body">
+
+  <!-- Side Navigation -->
+  <div class="spectrum-side-nav">
+    <div class="spectrum-side-nav-item selected" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+      </svg>
+      <span>ホーム</span>
+    </div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+      </svg>
+      <span>ファイル</span>
+    </div>
+    <div class="spectrum-side-nav-divider"></div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+      <span>プレビュー</span>
+    </div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+      </svg>
+      <span>処理</span>
+    </div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
+      <span>ミックス</span>
+    </div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+      </svg>
+      <span>エクスポート</span>
+    </div>
+    <div class="spectrum-side-nav-divider"></div>
+    <div class="spectrum-side-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+      <span>設定</span>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="spectrum-main">
+    <div class="spectrum-container">
+
+      <!-- Page Header -->
+      <div>
+        <h1 class="spectrum-heading-xl" style="margin-bottom:8px">ポッドキャスト処理</h1>
+        <p class="spectrum-detail">2人の音声ファイルを自動でミックス・編集します</p>
+      </div>
+
+      <!-- File Upload Card -->
+      <div class="spectrum-card">
+        <div class="spectrum-card-header">
+          <h2 class="spectrum-heading-md">音声ファイル</h2>
+        </div>
+        <div class="spectrum-card-content">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--spectrum-spacing-300)">
+            <div class="spectrum-dropzone">
+              <svg style="width:48px;height:48px;color:var(--spectrum-blue-600);margin-bottom:var(--spectrum-spacing-200)" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+              </svg>
+              <div class="spectrum-heading-sm" style="margin-bottom:4px">話者 A</div>
+              <div class="spectrum-detail">ドロップまたはクリック</div>
+              <div class="spectrum-detail" style="margin-top:4px">MP3 · WAV · M4A</div>
+            </div>
+            <div class="spectrum-dropzone">
+              <svg style="width:48px;height:48px;color:var(--spectrum-blue-600);margin-bottom:var(--spectrum-spacing-200)" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+              </svg>
+              <div class="spectrum-heading-sm" style="margin-bottom:4px">話者 B</div>
+              <div class="spectrum-detail">ドロップまたはクリック</div>
+              <div class="spectrum-detail" style="margin-top:4px">MP3 · WAV · M4A</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Settings Card -->
+      <div class="spectrum-card">
+        <div class="spectrum-card-header">
+          <h2 class="spectrum-heading-md">処理設定</h2>
+        </div>
+        <div class="spectrum-card-content">
+
+          <!-- Preview mode -->
+          <div class="spectrum-switch-row">
+            <div>
+              <div class="spectrum-heading-sm">プレビューモード</div>
+              <div class="spectrum-detail" style="margin-top:2px">最初の30秒のみ処理</div>
+            </div>
+            <div class="spectrum-switch" onclick="this.classList.toggle('checked')">
+              <div class="spectrum-switch-handle"></div>
+            </div>
+          </div>
+
+          <!-- Denoise -->
+          <div class="spectrum-switch-row">
+            <div>
+              <div class="spectrum-heading-sm">ノイズ除去</div>
+              <div class="spectrum-detail" style="margin-top:2px">Spectral gating モード</div>
+            </div>
+            <div class="spectrum-switch checked" onclick="this.classList.toggle('checked')">
+              <div class="spectrum-switch-handle"></div>
+            </div>
+          </div>
+
+          <!-- Target LUFS Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--spectrum-spacing-100)">
+              <div class="spectrum-heading-sm">目標ラウドネス</div>
+              <div class="spectrum-slider-value">-16.0 LUFS</div>
+            </div>
+            <div class="spectrum-slider-row">
+              <span class="spectrum-detail">-24</span>
+              <div class="spectrum-slider-track">
+                <div class="spectrum-slider-fill" style="width:53%">
+                  <div class="spectrum-slider-handle"></div>
+                </div>
+              </div>
+              <span class="spectrum-detail">-9</span>
+            </div>
+          </div>
+
+          <!-- Compression Ratio Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--spectrum-spacing-100)">
+              <div class="spectrum-heading-sm">コンプレッサー比率</div>
+              <div class="spectrum-slider-value">4 : 1</div>
+            </div>
+            <div class="spectrum-slider-row">
+              <span class="spectrum-detail">2</span>
+              <div class="spectrum-slider-track">
+                <div class="spectrum-slider-fill" style="width:25%">
+                  <div class="spectrum-slider-handle"></div>
+                </div>
+              </div>
+              <span class="spectrum-detail">10</span>
+            </div>
+          </div>
+
+          <!-- BGM LUFS Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--spectrum-spacing-100)">
+              <div class="spectrum-heading-sm">BGM音量</div>
+              <div class="spectrum-slider-value">-44 LUFS</div>
+            </div>
+            <div class="spectrum-slider-row">
+              <span class="spectrum-detail">-60</span>
+              <div class="spectrum-slider-track">
+                <div class="spectrum-slider-fill" style="width:40%">
+                  <div class="spectrum-slider-handle"></div>
+                </div>
+              </div>
+              <span class="spectrum-detail">-20</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex;justify-content:center;gap:var(--spectrum-spacing-300)">
+        <button class="spectrum-button spectrum-button-outline">
+          リセット
+        </button>
+        <button class="spectrum-button spectrum-button-accent spectrum-button-cta">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          処理実行
+        </button>
+      </div>
+
+      <!-- Processing Progress Card (hidden initially) -->
+      <div class="spectrum-card" style="display:none">
+        <div class="spectrum-card-content">
+          <div style="display:flex;justify-content:space-between;margin-bottom:var(--spectrum-spacing-200)">
+            <div class="spectrum-heading-sm">ノイズ除去中</div>
+            <div class="spectrum-heading-sm" style="color:var(--spectrum-blue-600)">65%</div>
+          </div>
+          <div class="spectrum-progress-bar">
+            <div class="spectrum-progress-fill" style="width:65%"></div>
+          </div>
+          <p class="spectrum-detail" style="text-align:center;margin-top:var(--spectrum-spacing-200)">
+            Spectral gating を適用しています...
+          </p>
+        </div>
+      </div>
+
+      <!-- Pipeline List Card -->
+      <div class="spectrum-card">
+        <div class="spectrum-card-header">
+          <h2 class="spectrum-heading-md">処理パイプライン</h2>
+        </div>
+        <div style="padding:0">
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">トリム</div>
+              <div class="spectrum-detail">クラップ検出・前後カット</div>
+            </div>
+          </div>
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">ノイズ除去</div>
+              <div class="spectrum-detail">Spectral gating · -50 dB</div>
+            </div>
+          </div>
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">ラウドネス正規化</div>
+              <div class="spectrum-detail">目標 -16.0 LUFS · EBU R128</div>
+            </div>
+          </div>
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">ダイナミクス処理</div>
+              <div class="spectrum-detail">コンプレッサー 4:1 · リミッター</div>
+            </div>
+          </div>
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">ミックス</div>
+              <div class="spectrum-detail">2チャンネル結合 · BGM追加 (-44 LUFS)</div>
+            </div>
+          </div>
+          <div class="spectrum-list-item">
+            <svg class="spectrum-list-item-icon" viewBox="0 0 24 24" fill="var(--spectrum-green-600)">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="spectrum-list-item-content">
+              <div class="spectrum-heading-sm">エクスポート</div>
+              <div class="spectrum-detail">MP3 192kbps · ステレオ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.spectrum-side-nav-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+</script>
+
+</body>
+</html>

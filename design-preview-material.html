@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Editor – Material Design 3</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Material Design 3 Tokens ──────────────────────────────── */
+    :root {
+      /* Color roles (Light theme with Material You dynamic color) */
+      --md-primary: #6750A4;
+      --md-on-primary: #FFFFFF;
+      --md-primary-container: #EADDFF;
+      --md-on-primary-container: #21005D;
+
+      --md-secondary: #625B71;
+      --md-on-secondary: #FFFFFF;
+      --md-secondary-container: #E8DEF8;
+      --md-on-secondary-container: #1D192B;
+
+      --md-tertiary: #7D5260;
+      --md-on-tertiary: #FFFFFF;
+
+      --md-error: #B3261E;
+      --md-on-error: #FFFFFF;
+      --md-error-container: #F9DEDC;
+
+      --md-surface: #FEF7FF;
+      --md-surface-dim: #DED8E1;
+      --md-surface-bright: #FEF7FF;
+      --md-surface-container-lowest: #FFFFFF;
+      --md-surface-container-low: #F7F2FA;
+      --md-surface-container: #F3EDF7;
+      --md-surface-container-high: #ECE6F0;
+      --md-surface-container-highest: #E6E0E9;
+
+      --md-on-surface: #1C1B1F;
+      --md-on-surface-variant: #49454F;
+      --md-outline: #79747E;
+      --md-outline-variant: #CAC4D0;
+
+      /* Elevation shadows */
+      --md-elevation-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+      --md-elevation-2: 0 1px 2px rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+      --md-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3);
+
+      /* Typography (Roboto) */
+      --md-font: 'Roboto', sans-serif;
+
+      /* Spacing (8dp grid) */
+      --md-space-1: 4px;
+      --md-space-2: 8px;
+      --md-space-3: 12px;
+      --md-space-4: 16px;
+      --md-space-6: 24px;
+      --md-space-8: 32px;
+
+      /* Shapes */
+      --md-shape-xs: 4px;
+      --md-shape-sm: 8px;
+      --md-shape-md: 12px;
+      --md-shape-lg: 16px;
+      --md-shape-xl: 28px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--md-font);
+      background: var(--md-surface);
+      color: var(--md-on-surface);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top App Bar ─────────────────────────────────────────── */
+    .md-top-app-bar {
+      height: 64px;
+      background: var(--md-surface);
+      border-bottom: 1px solid var(--md-outline-variant);
+      display: flex;
+      align-items: center;
+      padding: 0 var(--md-space-4);
+      gap: var(--md-space-4);
+      flex-shrink: 0;
+    }
+    .md-app-bar-title {
+      font-size: 22px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--md-on-surface);
+    }
+
+    /* Icon button */
+    .md-icon-btn {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+      background: transparent;
+      color: var(--md-on-surface-variant);
+    }
+    .md-icon-btn:hover { background: rgba(103,80,164,0.08); }
+
+    /* ── Body ────────────────────────────────────────────────── */
+    .md-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Navigation Rail ─────────────────────────────────────── */
+    .md-nav-rail {
+      width: 80px;
+      background: var(--md-surface-container-low);
+      border-right: 1px solid var(--md-outline-variant);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--md-space-3) 0;
+      gap: var(--md-space-2);
+      flex-shrink: 0;
+    }
+    .md-nav-item {
+      width: 56px; height: 32px;
+      border-radius: var(--md-shape-lg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--md-on-surface-variant);
+      font-size: 12px;
+      font-weight: 500;
+      gap: 4px;
+      padding: var(--md-space-1) 0;
+      position: relative;
+    }
+    .md-nav-item svg { width: 24px; height: 24px; }
+    .md-nav-item.active {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+    }
+    .md-nav-item:hover:not(.active) { background: rgba(103,80,164,0.08); }
+    .md-nav-item .label { font-size: 11px; }
+
+    /* ── Main Content ────────────────────────────────────────── */
+    .md-main {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--md-space-6);
+      background: var(--md-surface-bright);
+    }
+    .md-main::-webkit-scrollbar { width: 8px; }
+    .md-main::-webkit-scrollbar-thumb { background: var(--md-outline-variant); border-radius: 4px; }
+
+    /* Container */
+    .md-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--md-space-6);
+    }
+
+    /* ── Typography ──────────────────────────────────────────── */
+    .md-headline-lg {
+      font-size: 32px; font-weight: 400; line-height: 40px;
+      letter-spacing: 0; color: var(--md-on-surface);
+    }
+    .md-headline-md {
+      font-size: 28px; font-weight: 400; line-height: 36px;
+    }
+    .md-title-lg {
+      font-size: 22px; font-weight: 400; line-height: 28px;
+    }
+    .md-title-md {
+      font-size: 16px; font-weight: 500; line-height: 24px;
+      letter-spacing: 0.15px;
+    }
+    .md-body-lg {
+      font-size: 16px; font-weight: 400; line-height: 24px;
+      letter-spacing: 0.5px;
+    }
+    .md-body-md {
+      font-size: 14px; font-weight: 400; line-height: 20px;
+      letter-spacing: 0.25px;
+    }
+    .md-label-lg {
+      font-size: 14px; font-weight: 500; line-height: 20px;
+      letter-spacing: 0.1px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .md-card {
+      background: var(--md-surface-container-low);
+      border-radius: var(--md-shape-md);
+      box-shadow: var(--md-elevation-1);
+      overflow: hidden;
+    }
+    .md-card-header {
+      padding: var(--md-space-4);
+      border-bottom: 1px solid var(--md-outline-variant);
+    }
+    .md-card-content {
+      padding: var(--md-space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--md-space-4);
+    }
+
+    /* ── Button ──────────────────────────────────────────────── */
+    .md-btn {
+      height: 40px;
+      padding: 0 24px;
+      border-radius: var(--md-shape-xl);
+      font-family: var(--md-font);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    /* Filled button (primary) */
+    .md-btn-filled {
+      background: var(--md-primary);
+      color: var(--md-on-primary);
+      box-shadow: var(--md-elevation-1);
+    }
+    .md-btn-filled:hover {
+      box-shadow: var(--md-elevation-2);
+      background: #7965af;
+    }
+    .md-btn-filled:disabled {
+      background: rgba(28,27,31,0.12);
+      color: rgba(28,27,31,0.38);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* Outlined button */
+    .md-btn-outlined {
+      background: transparent;
+      color: var(--md-primary);
+      border: 1px solid var(--md-outline);
+    }
+    .md-btn-outlined:hover {
+      background: rgba(103,80,164,0.08);
+      border-color: var(--md-primary);
+    }
+
+    /* Text button */
+    .md-btn-text {
+      background: transparent;
+      color: var(--md-primary);
+      padding: 0 12px;
+    }
+    .md-btn-text:hover { background: rgba(103,80,164,0.08); }
+
+    /* ── FAB (Floating Action Button) ───────────────────────── */
+    .md-fab {
+      width: 56px; height: 56px;
+      border-radius: var(--md-shape-lg);
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      border: none;
+      cursor: pointer;
+      box-shadow: var(--md-elevation-3);
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .md-fab:hover {
+      box-shadow: 0 6px 10px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.3);
+    }
+    .md-fab svg { width: 24px; height: 24px; }
+
+    /* Extended FAB */
+    .md-fab-extended {
+      width: auto; height: 56px;
+      padding: 0 var(--md-space-4);
+      border-radius: var(--md-shape-lg);
+      background: var(--md-primary-container);
+      color: var(--md-on-primary-container);
+      font-family: var(--md-font);
+      font-size: 14px; font-weight: 500;
+      border: none; cursor: pointer;
+      box-shadow: var(--md-elevation-3);
+      display: flex; align-items: center; gap: var(--md-space-3);
+    }
+    .md-fab-extended:hover { box-shadow: 0 6px 10px 4px rgba(0,0,0,0.15), 0 2px 3px rgba(0,0,0,0.3); }
+
+    /* ── Chip ────────────────────────────────────────────────── */
+    .md-chip {
+      height: 32px;
+      padding: 0 var(--md-space-4);
+      border-radius: var(--md-shape-sm);
+      background: var(--md-surface-container-low);
+      border: 1px solid var(--md-outline);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--md-on-surface-variant);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--md-space-2);
+    }
+    .md-chip.selected {
+      background: var(--md-secondary-container);
+      color: var(--md-on-secondary-container);
+      border-color: transparent;
+    }
+
+    /* ── Text Field ──────────────────────────────────────────── */
+    .md-text-field {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .md-text-field input {
+      height: 56px;
+      padding: 8px 16px;
+      border: 1px solid var(--md-outline);
+      border-radius: var(--md-shape-xs);
+      font-family: var(--md-font);
+      font-size: 16px;
+      color: var(--md-on-surface);
+      background: var(--md-surface-container-highest);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .md-text-field input:focus {
+      border-color: var(--md-primary);
+      border-width: 2px;
+      padding: 8px 15px;
+    }
+    .md-text-field label {
+      position: absolute;
+      top: 16px; left: 16px;
+      font-size: 16px;
+      color: var(--md-on-surface-variant);
+      pointer-events: none;
+      transition: all 0.2s;
+    }
+    .md-text-field input:focus + label,
+    .md-text-field input:not(:placeholder-shown) + label {
+      top: -8px; left: 12px;
+      font-size: 12px;
+      background: var(--md-surface-container-highest);
+      padding: 0 4px;
+      color: var(--md-primary);
+    }
+
+    /* ── Slider ──────────────────────────────────────────────── */
+    .md-slider-row {
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-4);
+    }
+    .md-slider-track {
+      flex: 1; height: 4px;
+      background: var(--md-surface-container-highest);
+      border-radius: 2px;
+      position: relative;
+    }
+    .md-slider-fill {
+      height: 100%; background: var(--md-primary);
+      border-radius: 2px; position: relative;
+    }
+    .md-slider-thumb {
+      width: 20px; height: 20px;
+      background: var(--md-primary);
+      border-radius: 50%;
+      position: absolute;
+      right: -10px; top: 50%; transform: translateY(-50%);
+      box-shadow: var(--md-elevation-1);
+      cursor: pointer;
+    }
+    .md-slider-thumb:hover { box-shadow: var(--md-elevation-2); }
+
+    /* ── Switch ──────────────────────────────────────────────── */
+    .md-switch {
+      width: 52px; height: 32px;
+      border-radius: 16px;
+      background: var(--md-surface-container-highest);
+      border: 2px solid var(--md-outline);
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .md-switch-thumb {
+      width: 16px; height: 16px;
+      background: var(--md-outline);
+      border-radius: 50%;
+      position: absolute;
+      left: 6px; top: 50%; transform: translateY(-50%);
+      transition: all 0.2s;
+    }
+    .md-switch.checked {
+      background: var(--md-primary);
+      border-color: var(--md-primary);
+    }
+    .md-switch.checked .md-switch-thumb {
+      left: 28px;
+      background: var(--md-on-primary);
+      width: 24px; height: 24px;
+      transform: translate(-50%, -50%);
+      left: calc(100% - 6px);
+    }
+
+    /* ── Drop zone ───────────────────────────────────────────── */
+    .md-dropzone {
+      border: 2px dashed var(--md-outline);
+      border-radius: var(--md-shape-md);
+      padding: var(--md-space-8);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--md-surface-container-lowest);
+    }
+    .md-dropzone:hover {
+      border-color: var(--md-primary);
+      background: var(--md-surface-container-low);
+    }
+    .md-dropzone.active {
+      border-color: var(--md-primary);
+      background: var(--md-primary-container);
+    }
+
+    /* ── Progress ────────────────────────────────────────────── */
+    .md-progress {
+      height: 4px;
+      background: var(--md-surface-container-highest);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .md-progress-bar {
+      height: 100%;
+      background: var(--md-primary);
+      transition: width 0.3s;
+    }
+
+    /* ── List ────────────────────────────────────────────────── */
+    .md-list-item {
+      min-height: 56px;
+      padding: var(--md-space-2) var(--md-space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--md-space-4);
+      cursor: pointer;
+      transition: background 0.2s;
+      border-radius: var(--md-shape-sm);
+    }
+    .md-list-item:hover { background: rgba(103,80,164,0.08); }
+    .md-list-item-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top App Bar -->
+<div class="md-top-app-bar">
+  <button class="md-icon-btn">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+  </button>
+  <div class="md-app-bar-title">Podcast Editor</div>
+  <div style="flex:1"></div>
+  <button class="md-icon-btn">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+  </button>
+</div>
+
+<!-- Body -->
+<div class="md-body">
+
+  <!-- Navigation Rail -->
+  <div class="md-nav-rail">
+    <div class="md-nav-item active" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span class="label">ホーム</span>
+    </div>
+    <div class="md-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+      <span class="label">ファイル</span>
+    </div>
+    <div class="md-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <span class="label">設定</span>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="md-main">
+    <div class="md-container">
+
+      <!-- Header -->
+      <div>
+        <h1 class="md-headline-lg" style="margin-bottom:8px">ポッドキャスト処理</h1>
+        <p class="md-body-lg" style="color:var(--md-on-surface-variant)">2人の音声ファイルを自動でミックス・編集します</p>
+      </div>
+
+      <!-- File Upload Card -->
+      <div class="md-card">
+        <div class="md-card-header">
+          <h2 class="md-title-lg">音声ファイル</h2>
+        </div>
+        <div class="md-card-content">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="md-dropzone">
+              <svg style="width:48px;height:48px;color:var(--md-primary);margin-bottom:12px" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+              </svg>
+              <div class="md-title-md" style="margin-bottom:4px">話者 A</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">ドロップまたはクリック</div>
+            </div>
+            <div class="md-dropzone">
+              <svg style="width:48px;height:48px;color:var(--md-primary);margin-bottom:12px" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+              </svg>
+              <div class="md-title-md" style="margin-bottom:4px">話者 B</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">ドロップまたはクリック</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Card -->
+      <div class="md-card">
+        <div class="md-card-header">
+          <h2 class="md-title-lg">処理設定</h2>
+        </div>
+        <div class="md-card-content">
+          <!-- Preview mode -->
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="md-title-md">プレビューモード</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant);margin-top:4px">最初の30秒のみ処理</div>
+            </div>
+            <div class="md-switch" onclick="this.classList.toggle('checked')">
+              <div class="md-switch-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Denoise -->
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="md-title-md">ノイズ除去</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant);margin-top:4px">Spectral モード</div>
+            </div>
+            <div class="md-switch checked" onclick="this.classList.toggle('checked')">
+              <div class="md-switch-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Target LUFS -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <div class="md-label-lg">目標ラウドネス</div>
+              <div class="md-label-lg" style="color:var(--md-primary)">-16.0 LUFS</div>
+            </div>
+            <div class="md-slider-row">
+              <span class="md-body-md" style="color:var(--md-on-surface-variant)">-24</span>
+              <div class="md-slider-track">
+                <div class="md-slider-fill" style="width:67%">
+                  <div class="md-slider-thumb"></div>
+                </div>
+              </div>
+              <span class="md-body-md" style="color:var(--md-on-surface-variant)">-9</span>
+            </div>
+          </div>
+
+          <!-- Compression ratio -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <div class="md-label-lg">コンプレッサー比率</div>
+              <div class="md-label-lg" style="color:var(--md-primary)">4 : 1</div>
+            </div>
+            <div class="md-slider-row">
+              <span class="md-body-md" style="color:var(--md-on-surface-variant)">2</span>
+              <div class="md-slider-track">
+                <div class="md-slider-fill" style="width:25%">
+                  <div class="md-slider-thumb"></div>
+                </div>
+              </div>
+              <span class="md-body-md" style="color:var(--md-on-surface-variant)">10</span>
+            </div>
+          </div>
+
+          <!-- Export format chips -->
+          <div>
+            <div class="md-label-lg" style="margin-bottom:12px">出力フォーマット</div>
+            <div style="display:flex;gap:8px">
+              <div class="md-chip selected">MP3 (192k)</div>
+              <div class="md-chip">WAV</div>
+              <div class="md-chip">MP3 (320k)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Process Button -->
+      <div style="display:flex;justify-content:center;gap:16px">
+        <button class="md-btn md-btn-outlined">設定リセット</button>
+        <button class="md-fab-extended">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          処理実行
+        </button>
+      </div>
+
+      <!-- Processing Progress (hidden initially) -->
+      <div class="md-card" style="display:none">
+        <div class="md-card-content">
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+            <div class="md-title-md">ノイズ除去中</div>
+            <div class="md-title-md" style="color:var(--md-primary)">65%</div>
+          </div>
+          <div class="md-progress">
+            <div class="md-progress-bar" style="width:65%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pipeline List -->
+      <div class="md-card">
+        <div class="md-card-header">
+          <h2 class="md-title-lg">処理パイプライン</h2>
+        </div>
+        <div class="md-card-content" style="padding:0;gap:0">
+          <div class="md-list-item">
+            <svg style="width:24px;height:24px;color:var(--md-primary)" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="md-list-item-text">
+              <div class="md-title-md">トリム</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">クラップ検出・前後カット</div>
+            </div>
+          </div>
+          <div class="md-list-item">
+            <svg style="width:24px;height:24px;color:var(--md-primary)" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="md-list-item-text">
+              <div class="md-title-md">ノイズ除去</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">Spectral モード · -50 dB</div>
+            </div>
+          </div>
+          <div class="md-list-item">
+            <svg style="width:24px;height:24px;color:var(--md-primary)" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="md-list-item-text">
+              <div class="md-title-md">ラウドネス正規化</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">目標 -16.0 LUFS · EBU R128</div>
+            </div>
+          </div>
+          <div class="md-list-item">
+            <svg style="width:24px;height:24px;color:var(--md-primary)" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <div class="md-list-item-text">
+              <div class="md-title-md">BGM</div>
+              <div class="md-body-md" style="color:var(--md-on-surface-variant)">bgm-2024.mp3 · -44 LUFS</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.md-nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>

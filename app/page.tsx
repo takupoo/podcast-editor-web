@@ -243,30 +243,23 @@ export default function Home() {
   };
 
   return (
-    <div className="tg-root flex items-stretch justify-center min-h-dvh p-0 md:p-8">
-      {/* Glass window – full screen on mobile, centered card on desktop */}
+    <div className="tg-root flex items-stretch justify-center min-h-dvh">
+      {/* Main container */}
       <div
-        className="tg-window flex flex-col w-full md:w-auto md:min-w-[900px] md:max-w-[1040px] md:rounded-[28px] overflow-hidden"
+        className="tg-window flex flex-col w-full overflow-hidden"
         style={{ minHeight: '100dvh' }}
       >
-        {/* ── Titlebar ──────────────────────────────────────── */}
+        {/* ── Header ────────────────────────────────────────── */}
         <div
-          className="flex items-center px-4 shrink-0"
+          className="flex items-center px-6 shrink-0"
           style={{
-            height: 28,
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            position: 'relative',
+            height: 56,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.02)',
           }}
         >
-          {/* Traffic lights (only visible on desktop/md+) */}
-          <div className="hidden md:flex gap-2 items-center">
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #ff7b72, #ff5f57)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #fedc6e, #febc2e)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #56e775, #28c840)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
-          </div>
           <div style={{
-            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-            fontSize: 13, fontWeight: 500, color: 'var(--tg-t2)', letterSpacing: '-0.1px',
+            fontSize: 16, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px',
           }}>
             Podcast Editor
           </div>
@@ -274,11 +267,11 @@ export default function Home() {
 
         {/* ── Toolbar ───────────────────────────────────────── */}
         <div
-          className="flex items-center px-4 gap-3 shrink-0"
+          className="flex items-center px-6 gap-3 shrink-0"
           style={{
-            height: 48,
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.02)',
+            height: 52,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
           }}
         >
           {/* Segmented preview/full */}

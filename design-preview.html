@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI Design Candidates</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.15); }
+  .tab-btn { transition: all 0.2s; }
+  .tab-btn.active { background: #3b82f6; color: white; }
+  .design { display: none; }
+  .design.active { display: block; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+
+<!-- タブ切り替え -->
+<div class="max-w-5xl mx-auto">
+  <div class="flex gap-2 mb-6">
+    <button onclick="show('c1')" id="tab-c1" class="tab-btn active px-5 py-2 rounded-full text-sm font-medium bg-blue-500 text-white">C1: ステップ型</button>
+    <button onclick="show('c2')" id="tab-c2" class="tab-btn px-5 py-2 rounded-full text-sm font-medium bg-white text-gray-600 shadow">C2: サイドバー型</button>
+    <button onclick="show('c3')" id="tab-c3" class="tab-btn px-5 py-2 rounded-full text-sm font-medium bg-white text-gray-600 shadow">C3: グラスモーフィズム</button>
+  </div>
+
+  <!-- ===== C1: ステップ型 ===== -->
+  <div id="c1" class="design active">
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-5">
+        <h1 class="text-white text-xl font-bold">Podcast Editor</h1>
+        <p class="text-blue-200 text-sm mt-1">ステップに沿って設定・処理</p>
+      </div>
+
+      <!-- ステップインジケーター -->
+      <div class="flex items-center px-8 py-5 border-b bg-gray-50">
+        <div class="flex items-center">
+          <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+          <span class="ml-2 text-sm font-medium text-blue-600">ファイル選択</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-200 mx-3"></div>
+        <div class="flex items-center">
+          <div class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">2</div>
+          <span class="ml-2 text-sm text-gray-400">音声設定</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-200 mx-3"></div>
+        <div class="flex items-center">
+          <div class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">3</div>
+          <span class="ml-2 text-sm text-gray-400">BGM / 仕上げ</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-gray-200 mx-3"></div>
+        <div class="flex items-center">
+          <div class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">4</div>
+          <span class="ml-2 text-sm text-gray-400">処理・出力</span>
+        </div>
+      </div>
+
+      <!-- ステップ1コンテンツ -->
+      <div class="p-8">
+        <h2 class="text-lg font-semibold text-gray-800 mb-6">ファイルを選択してください</h2>
+        <div class="grid grid-cols-2 gap-5">
+          <div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
+            <div class="text-4xl mb-3">🎙️</div>
+            <p class="font-medium text-gray-700">話者 A</p>
+            <p class="text-sm text-gray-400 mt-1">クリックまたはドロップ</p>
+          </div>
+          <div class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
+            <div class="text-4xl mb-3">🎙️</div>
+            <p class="font-medium text-gray-700">話者 B</p>
+            <p class="text-sm text-gray-400 mt-1">クリックまたはドロップ</p>
+          </div>
+        </div>
+        <div class="flex justify-end mt-8">
+          <button class="px-8 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm">
+            次へ →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== C2: サイドバー型 ===== -->
+  <div id="c2" class="design">
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex" style="min-height:580px">
+      <!-- 左サイドバー -->
+      <div class="w-72 flex-shrink-0 bg-gray-900 text-white p-5 flex flex-col">
+        <div class="mb-6">
+          <h1 class="text-lg font-bold text-white">Podcast Editor</h1>
+          <p class="text-xs text-gray-400 mt-1">全パラメータ調整可能</p>
+        </div>
+
+        <!-- ナビゲーション -->
+        <nav class="flex-1 space-y-1">
+          <button class="w-full text-left px-3 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium flex items-center gap-2">
+            <span>🎵</span> 音声・ノイズ
+          </button>
+          <button class="w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 text-sm flex items-center gap-2 transition-colors">
+            <span>🔊</span> ラウドネス
+          </button>
+          <button class="w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 text-sm flex items-center gap-2 transition-colors">
+            <span>🎸</span> BGM
+          </button>
+          <button class="w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 text-sm flex items-center gap-2 transition-colors">
+            <span>🎬</span> エンドシーン
+          </button>
+          <button class="w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 text-sm flex items-center gap-2 transition-colors">
+            <span>✂️</span> 無音カット
+          </button>
+          <button class="w-full text-left px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 text-sm flex items-center gap-2 transition-colors">
+            <span>📦</span> エクスポート
+          </button>
+        </nav>
+
+        <!-- 設定プレビュー -->
+        <div class="mt-4 p-3 bg-gray-800 rounded-lg text-xs text-gray-400 space-y-1">
+          <div class="flex justify-between"><span>ターゲット</span><span class="text-gray-200">-16 LUFS</span></div>
+          <div class="flex justify-between"><span>BGM音量</span><span class="text-gray-200">-44 LUFS</span></div>
+          <div class="flex justify-between"><span>フォーマット</span><span class="text-gray-200">MP3 192k</span></div>
+        </div>
+      </div>
+
+      <!-- 右メイン -->
+      <div class="flex-1 flex flex-col">
+        <!-- 上部: ファイル選択 -->
+        <div class="p-6 border-b">
+          <h2 class="text-base font-semibold text-gray-700 mb-4">ファイル選択</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="border border-dashed border-gray-300 rounded-xl p-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              <p class="text-sm font-medium text-gray-600">話者 A</p>
+              <p class="text-xs text-gray-400 mt-1">未選択</p>
+            </div>
+            <div class="border border-dashed border-gray-300 rounded-xl p-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              <p class="text-sm font-medium text-gray-600">話者 B</p>
+              <p class="text-xs text-gray-400 mt-1">未選択</p>
+            </div>
+          </div>
+        </div>
+        <!-- 下部: 設定内容 -->
+        <div class="p-6 flex-1">
+          <h2 class="text-base font-semibold text-gray-700 mb-4">音声・ノイズ設定</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="text-sm text-gray-500">ノイズ除去</label>
+              <div class="mt-1.5 flex gap-2">
+                <button class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium border border-blue-200">Spectral</button>
+                <button class="px-3 py-1.5 text-gray-500 rounded-lg text-sm hover:bg-gray-100 border border-transparent">afftdn</button>
+                <button class="px-3 py-1.5 text-gray-500 rounded-lg text-sm hover:bg-gray-100 border border-transparent">なし</button>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1.5">
+                <label class="text-sm text-gray-500">ノイズフロア閾値</label>
+                <span class="text-sm font-mono text-gray-700">-50 dB</span>
+              </div>
+              <div class="relative h-2 bg-gray-200 rounded-full">
+                <div class="absolute left-0 top-0 h-2 bg-blue-500 rounded-full" style="width:40%"></div>
+                <div class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-blue-500 rounded-full shadow" style="left:38%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 処理ボタン -->
+        <div class="p-6 border-t bg-gray-50">
+          <button class="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors shadow-sm">
+            処理開始
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== C3: グラスモーフィズム ===== -->
+  <div id="c3" class="design">
+    <div class="rounded-2xl overflow-hidden" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); min-height:580px; padding:32px; position:relative;">
+      <!-- 背景グロー -->
+      <div style="position:absolute;top:-80px;left:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(99,102,241,0.3),transparent);pointer-events:none;"></div>
+      <div style="position:absolute;bottom:-60px;right:-60px;width:250px;height:250px;background:radial-gradient(circle,rgba(59,130,246,0.25),transparent);pointer-events:none;"></div>
+
+      <div class="relative">
+        <!-- ヘッダー -->
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Podcast Editor</h1>
+            <p class="text-indigo-300 text-sm mt-1">Browser-based audio processing</p>
+          </div>
+          <div class="glass rounded-xl px-4 py-2 flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span class="text-sm text-gray-300">Ready</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-5">
+          <!-- ファイルアップロード -->
+          <div class="col-span-2 space-y-4">
+            <div class="glass rounded-2xl p-5">
+              <p class="text-xs text-indigo-300 uppercase tracking-widest font-medium mb-4">Audio Sources</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="border border-dashed border-indigo-500/40 rounded-xl p-5 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-500/10 transition-all">
+                  <div class="text-3xl mb-2">🎙️</div>
+                  <p class="text-sm font-medium text-gray-300">Track A</p>
+                  <p class="text-xs text-gray-500 mt-1">Drop audio file</p>
+                </div>
+                <div class="border border-dashed border-indigo-500/40 rounded-xl p-5 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-500/10 transition-all">
+                  <div class="text-3xl mb-2">🎙️</div>
+                  <p class="text-sm font-medium text-gray-300">Track B</p>
+                  <p class="text-xs text-gray-500 mt-1">Drop audio file</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass rounded-2xl p-5">
+              <p class="text-xs text-indigo-300 uppercase tracking-widest font-medium mb-4">Processing Pipeline</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-3 py-1.5 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-full text-xs">Clap Sync</span>
+                <span class="px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-full text-xs">Denoise</span>
+                <span class="px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-full text-xs">Loudness -16 LUFS</span>
+                <span class="px-3 py-1.5 bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 rounded-full text-xs">Dynamics</span>
+                <span class="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-full text-xs">BGM Mix</span>
+                <span class="px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-full text-xs">Endscene</span>
+                <span class="px-3 py-1.5 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-full text-xs">MP3 Export</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右パネル: パラメータ -->
+          <div class="space-y-4">
+            <div class="glass rounded-2xl p-5">
+              <p class="text-xs text-indigo-300 uppercase tracking-widest font-medium mb-4">Parameters</p>
+              <div class="space-y-4">
+                <div>
+                  <div class="flex justify-between mb-1.5">
+                    <span class="text-xs text-gray-400">Target LUFS</span>
+                    <span class="text-xs font-mono text-indigo-300">-16</span>
+                  </div>
+                  <div class="relative h-1.5 bg-white/10 rounded-full">
+                    <div class="absolute left-0 top-0 h-1.5 rounded-full" style="width:60%;background:linear-gradient(90deg,#6366f1,#3b82f6)"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex justify-between mb-1.5">
+                    <span class="text-xs text-gray-400">BGM Volume</span>
+                    <span class="text-xs font-mono text-indigo-300">-44 LUFS</span>
+                  </div>
+                  <div class="relative h-1.5 bg-white/10 rounded-full">
+                    <div class="absolute left-0 top-0 h-1.5 rounded-full" style="width:30%;background:linear-gradient(90deg,#6366f1,#3b82f6)"></div>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs text-gray-400">Denoise</span>
+                  <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs">Spectral</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs text-gray-400">Format</span>
+                  <span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">MP3 192k</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="w-full py-3 rounded-xl text-white font-medium text-sm transition-all hover:opacity-90 hover:shadow-lg" style="background:linear-gradient(135deg,#6366f1,#3b82f6)">
+              ▶ Start Processing
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.design').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active','bg-blue-500','text-white');
+    b.classList.add('bg-white','text-gray-600','shadow');
+  });
+  document.getElementById(id).classList.add('active');
+  const btn = document.getElementById('tab-' + id);
+  btn.classList.add('active','bg-blue-500','text-white');
+  btn.classList.remove('bg-white','text-gray-600','shadow');
+}
+</script>
+</body>
+</html>

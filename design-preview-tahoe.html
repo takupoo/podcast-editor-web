@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Editor – macOS Tahoe / Liquid Glass</title>
+  <style>
+    /* ── macOS Tahoe design tokens ─────────────────────── */
+    :root {
+      /* Liquid Glass (dark mode) */
+      --glass-bg:        rgba(10, 10, 16, 0.62);
+      --glass-bg-deep:   rgba(6,  6, 12, 0.72);
+      --glass-sidebar:   rgba(0,   0,  8, 0.48);
+      --glass-ctrl:      rgba(255,255,255,0.08);
+      --glass-ctrl-h:    rgba(255,255,255,0.13);
+      --glass-border:    rgba(255,255,255,0.11);
+      --glass-edge:      rgba(255,255,255,0.18);  /* specular highlight */
+      --glass-shadow:    rgba(0, 0, 0, 0.7);
+      --glass-blur:      blur(36px) saturate(1.9);
+      --glass-blur-sm:   blur(20px) saturate(1.7);
+
+      /* Text */
+      --t1:  rgba(255,255,255,0.90);
+      --t2:  rgba(255,255,255,0.55);
+      --t3:  rgba(255,255,255,0.28);
+      --t4:  rgba(255,255,255,0.12);
+
+      /* System colors */
+      --accent:   #0A84FF;
+      --accent2:  rgba(10, 132, 255, 0.18);
+      --green:    #30D158;
+      --orange:   #FF9F0A;
+      --red:      #FF453A;
+      --purple:   #BF5AF2;
+
+      /* Geometry */
+      --r-window:  28px;     /* aggressive – Tahoe hallmark */
+      --r-ctrl:    12px;
+      --r-row:     10px;
+      --r-tag:     6px;
+
+      /* Grid = 8pt */
+      --u: 8px;
+
+      --font: -apple-system, "Helvetica Neue", sans-serif;
+      --mono: "SF Mono", "Menlo", monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── DESKTOP WALLPAPER ─────────────────────────────── */
+    body {
+      font-family: var(--font);
+      font-size: 13px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      /* macOS Tahoe-style wallpaper gradient */
+      background:
+        radial-gradient(ellipse 80% 60% at 15% 25%, rgba(100, 30, 220, 0.45) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 50% at 85% 20%, rgba(0, 80, 220, 0.40) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 70% at 75% 85%, rgba(0, 180, 120, 0.30) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 50% at 30% 80%, rgba(180, 30, 100, 0.25) 0%, transparent 55%),
+        linear-gradient(145deg, #06050f 0%, #0c0a20 40%, #060e18 100%);
+      background-attachment: fixed;
+    }
+
+    /* ── WINDOW ────────────────────────────────────────── */
+    .window {
+      width: 1000px;
+      height: 720px;
+      border-radius: var(--r-window);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      user-select: none;
+
+      /* Liquid Glass window material */
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        inset 0 1px 0 var(--glass-edge),     /* top specular */
+        inset 0 -1px 0 rgba(0,0,0,0.3),      /* bottom edge */
+        0 0 0 0.5px rgba(0,0,0,0.6),         /* tight outer ring */
+        0 40px 120px rgba(0,0,0,0.85),
+        0 12px 40px rgba(0,0,0,0.55);
+    }
+
+    /* ── TITLE BAR (transparent – Tahoe standard) ─────── */
+    .titlebar {
+      height: 28px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 var(--u);
+      position: relative;
+      /* No background – pure glass pass-through */
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .traffic {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      position: relative; cursor: default;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2);
+    }
+    .dot.close    { background: radial-gradient(circle at 40% 35%, #ff7b72, #ff5f57); }
+    .dot.minimize { background: radial-gradient(circle at 40% 35%, #fedc6e, #febc2e); }
+    .dot.zoom     { background: radial-gradient(circle at 40% 35%, #56e775, #28c840); }
+
+    .win-title {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: 13px; font-weight: 500; color: var(--t2);
+      letter-spacing: -0.1px;
+    }
+
+    /* ── TOOLBAR ───────────────────────────────────────── */
+    .toolbar {
+      height: 48px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+    }
+    .spacer { flex: 1; }
+
+    /* Liquid Glass segmented control */
+    .seg {
+      display: flex;
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;    /* Tahoe: capsule for controls */
+      padding: 2px;
+      gap: 1px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+    .seg-btn {
+      padding: 4px 16px;
+      font-size: 12px; font-weight: 500;
+      color: var(--t2);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .18s ease;
+      letter-spacing: -.1px;
+    }
+    .seg-btn.active {
+      background: rgba(255,255,255,0.12);
+      color: var(--t1);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* Glass button */
+    .gbtn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 14px;
+      font-size: 12px; font-weight: 500;
+      color: var(--t1);
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;   /* capsule – Tahoe large button */
+      cursor: pointer;
+      transition: all .16s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .gbtn:hover {
+      background: rgba(255,255,255,0.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 12px rgba(0,0,0,0.4);
+    }
+    .gbtn svg { width: 13px; height: 13px; }
+
+    /* Primary action – XL capsule (new in Tahoe) */
+    .gbtn.primary {
+      background: linear-gradient(180deg, rgba(10,148,255,0.95), rgba(0,105,220,0.95));
+      border-color: rgba(255,255,255,0.18);
+      padding: 5px 18px;
+      font-size: 13px; font-weight: 600;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.25),
+        0 0 0 .5px rgba(0,70,160,0.5),
+        0 4px 16px rgba(0,90,200,0.5),
+        0 1px 4px rgba(0,0,0,0.4);
+    }
+    .gbtn.primary:hover {
+      background: linear-gradient(180deg, rgba(20,158,255,0.98), rgba(10,115,230,0.98));
+    }
+
+    /* File chip */
+    .filechip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 100px;
+      font-size: 12px; color: var(--t1);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+    .filechip svg { width: 12px; height: 12px; color: var(--t3); }
+
+    /* ── BODY ─────────────────────────────────────────── */
+    .body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ──────────────────────────────────────── */
+    .sidebar {
+      width: 224px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 0 16px;
+      overflow-y: auto;
+      border-right: 1px solid rgba(255,255,255,0.06);
+
+      /* Sidebar Liquid Glass – Tahoe sidebar material */
+      background: var(--glass-sidebar);
+      backdrop-filter: blur(24px) saturate(1.8);
+      -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    }
+    .sidebar::-webkit-scrollbar { width: 0; }
+
+    .sec-hdr {
+      padding: 10px 16px 4px;
+      font-size: 11px; font-weight: 600;
+      color: var(--t3);
+      letter-spacing: .6px;
+      text-transform: uppercase;
+    }
+
+    /* Nav row */
+    .nav {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 10px;
+      margin: 1px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .12s ease;
+    }
+    .nav:hover { background: rgba(255,255,255,0.06); }
+    .nav.active {
+      background: rgba(255,255,255,0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.13);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .nav-ico {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+    .nav.active .nav-ico {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.14);
+    }
+    .nav-ico svg { width: 13px; height: 13px; color: var(--t2); }
+    .nav.active .nav-ico svg { color: var(--t1); }
+
+    .nav-lbl { font-size: 13px; color: var(--t2); line-height: 1; }
+    .nav.active .nav-lbl { color: var(--t1); }
+    .nav-badge { margin-left: auto; font-size: 11px; color: var(--t3); }
+
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      margin-left: auto; flex-shrink: 0;
+    }
+    .status-dot.on  { background: var(--green);  box-shadow: 0 0 6px rgba(48,209,88,.5); }
+    .status-dot.off { background: var(--t4); }
+
+    .sidebar-sep {
+      height: 1px; background: rgba(255,255,255,0.05);
+      margin: 8px 0;
+    }
+
+    /* ── MAIN ─────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .main::-webkit-scrollbar { width: 6px; }
+    .main::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+    }
+
+    .panel {
+      padding: 24px;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel.visible { display: flex; }
+
+    /* Stage header */
+    .s-hdr {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 4px;
+    }
+    .s-ico {
+      width: 44px; height: 44px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.2),
+        0 4px 16px rgba(0,0,0,0.4);
+    }
+    .s-ico svg { width: 21px; height: 21px; color: #fff; }
+    .s-titles h2 {
+      font-size: 18px; font-weight: 600; color: var(--t1);
+      letter-spacing: -.35px;
+    }
+    .s-titles p { font-size: 12px; color: var(--t2); margin-top: 2px; }
+
+    /* Toggle */
+    .tog-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .tog-lbl  { font-size: 12px; color: var(--t2); }
+    .toggle {
+      width: 38px; height: 22px;
+      background: var(--green);
+      border-radius: 11px;
+      position: relative; cursor: pointer;
+      transition: background .22s;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle.off { background: rgba(255,255,255,0.13); }
+    .knob {
+      position: absolute;
+      width: 18px; height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px; left: 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      transition: left .22s cubic-bezier(.4,0,.2,1);
+    }
+    .toggle.off .knob { left: 2px; }
+
+    /* Glass group (settings container) */
+    .grp {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px) saturate(1.5);
+      -webkit-backdrop-filter: blur(12px) saturate(1.5);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .grp-hdr {
+      padding: 9px 16px 5px;
+      font-size: 11px; font-weight: 600;
+      color: var(--t3);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .row {
+      display: flex; align-items: center;
+      padding: 11px 16px; gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      min-height: 44px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-lbl {
+      font-size: 13px; color: var(--t1);
+      min-width: 136px; flex-shrink: 0;
+    }
+    .row-ctrl { flex: 1; display: flex; align-items: center; gap: 10px; }
+    .row-val {
+      font-size: 12px; color: var(--t2);
+      font-family: var(--mono);
+      min-width: 68px; text-align: right;
+    }
+
+    /* Inline segmented (Tahoe style – capsule) */
+    .iseg {
+      display: flex;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 100px;
+      padding: 2px;
+      gap: 1px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .iseg-btn {
+      padding: 3px 12px;
+      font-size: 12px; color: var(--t2);
+      border-radius: 100px;
+      cursor: pointer;
+      transition: all .14s;
+    }
+    .iseg-btn.active {
+      background: rgba(255,255,255,0.12);
+      color: var(--t1);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+
+    /* Slider – Tahoe style */
+    .slrow { flex: 1; display: flex; align-items: center; gap: 8px; }
+    .sl-min, .sl-max { font-size: 11px; color: var(--t3); flex-shrink: 0; }
+    .sl-track {
+      flex: 1; height: 4px;
+      background: rgba(255,255,255,0.10);
+      border-radius: 2px;
+      position: relative;
+    }
+    .sl-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      position: relative;
+      box-shadow: 0 0 8px rgba(10,132,255,0.5);
+    }
+    .sl-thumb {
+      position: absolute;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.9),
+        0 0 0 .5px rgba(0,0,0,0.2),
+        0 2px 6px rgba(0,0,0,0.5);
+      right: -8px; top: 50%; transform: translateY(-50%);
+      cursor: grab;
+    }
+
+    /* Text field */
+    .field {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 8px;
+      padding: 5px 11px;
+      font-size: 13px; color: var(--t1);
+      font-family: var(--font);
+      transition: border-color .14s;
+    }
+    .field:focus { outline: none; border-color: rgba(10,132,255,0.5); background: rgba(255,255,255,0.08); }
+    .field::placeholder { color: var(--t3); }
+
+    .field-btn {
+      padding: 5px 13px;
+      font-size: 12px; font-weight: 500;
+      color: var(--t1);
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
+      cursor: pointer;
+      transition: background .12s;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .field-btn:hover { background: rgba(255,255,255,0.12); }
+
+    /* Drop zone */
+    .dropzone {
+      border: 1.5px dashed rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 32px 20px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .dropzone:hover {
+      border-color: rgba(10,132,255,.5);
+      background: rgba(10,132,255,0.05);
+    }
+    .dz-ico { width: 40px; height: 40px; color: var(--t3); }
+    .dz-title { font-size: 15px; font-weight: 500; color: var(--t1); }
+    .dz-sub { font-size: 12px; color: var(--t2); }
+    .dz-divider { font-size: 11px; color: var(--t3); }
+    .dz-btn {
+      margin-top: 4px;
+      padding: 6px 18px;
+      font-size: 12px; font-weight: 600;
+      background: linear-gradient(180deg, rgba(10,148,255,.9), rgba(0,105,220,.9));
+      color: #fff;
+      border-radius: 100px;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 4px 12px rgba(0,90,200,.45);
+    }
+
+    /* Notice */
+    .notice {
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 12px 14px;
+      background: rgba(10,132,255,0.07);
+      border: 1px solid rgba(10,132,255,0.18);
+      border-radius: 12px;
+      font-size: 12px; color: var(--t2); line-height: 1.55;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .notice svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+    .notice.warn {
+      background: rgba(255,159,10,0.07);
+      border-color: rgba(255,159,10,0.2);
+    }
+    .notice.warn svg { color: var(--orange); }
+
+    /* Overview pipeline */
+    .pipe-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .pipe-row:hover { background: rgba(255,255,255,0.05); }
+    .pipe-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.11);
+      font-size: 11px; font-weight: 700;
+      color: var(--t2);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .pipe-row:hover .pipe-num { background: rgba(255,255,255,0.13); color: var(--t1); }
+    .pipe-name { font-size: 13px; color: var(--t1); font-weight: 500; }
+    .pipe-desc { font-size: 12px; color: var(--t2); margin-top: 1px; }
+    .pipe-tag {
+      margin-left: auto;
+      font-size: 11px; font-weight: 600;
+      padding: 3px 9px; border-radius: 100px;
+    }
+    .pipe-tag.on {
+      background: rgba(48,209,88,0.15);
+      color: var(--green);
+      border: 1px solid rgba(48,209,88,0.2);
+      box-shadow: 0 0 8px rgba(48,209,88,0.15);
+    }
+    .pipe-tag.off {
+      background: rgba(255,255,255,0.06);
+      color: var(--t3);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    /* ── STATUS BAR ───────────────────────────────────── */
+    .statusbar {
+      height: 24px;
+      flex-shrink: 0;
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 10px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.15);
+    }
+    .st-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px rgba(48,209,88,.5);
+    }
+    .st-txt { font-size: 11px; color: var(--t2); }
+    .st-bar { width: 120px; height: 2px; background: rgba(255,255,255,0.08); border-radius: 1px; }
+    .st-fill { height: 100%; width: 0; background: var(--accent); border-radius: 1px; transition: width .5s; }
+    .st-right { margin-left: auto; font-size: 11px; color: var(--t3); }
+
+    /* ── Subtle shimmer on glass surfaces ─────────────── */
+    @keyframes shimmer {
+      0%   { opacity: 0.0; transform: translateX(-100%) rotate(20deg); }
+      50%  { opacity: 0.03; }
+      100% { opacity: 0.0; transform: translateX(200%) rotate(20deg); }
+    }
+    .window::after {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 40%; height: 200%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+      animation: shimmer 8s ease-in-out infinite 2s;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <div class="traffic">
+      <div class="dot close"></div>
+      <div class="dot minimize"></div>
+      <div class="dot zoom"></div>
+    </div>
+    <div class="win-title">Podcast Editor</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="seg">
+      <div class="seg-btn active">編集</div>
+      <div class="seg-btn">プレビュー</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="filechip" id="filechip" style="display:none">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
+      episode-001.wav
+    </div>
+    <div class="gbtn">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
+      リセット
+    </div>
+    <div class="gbtn primary">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+      処理実行
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sec-hdr">ソース</div>
+      <div class="nav" onclick="show('source',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg></div>
+        <span class="nav-lbl">音声ファイル</span>
+        <span class="nav-badge" id="fbadge">未選択</span>
+      </div>
+
+      <div class="sidebar-sep"></div>
+
+      <div class="sec-hdr">処理ステージ</div>
+      <div class="nav active" onclick="show('overview',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z"/></svg></div>
+        <span class="nav-lbl">概要</span>
+      </div>
+      <div class="nav" onclick="show('trim',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 5l8 0M4 11l8 0M2 8h12"/></svg></div>
+        <span class="nav-lbl">1. トリム</span>
+        <div class="status-dot on"></div>
+      </div>
+      <div class="nav" onclick="show('denoise',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg></div>
+        <span class="nav-lbl">2. ノイズ除去</span>
+        <div class="status-dot on"></div>
+      </div>
+      <div class="nav" onclick="show('loudness',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2v12M5 5v6M2 7v2M11 4v8M14 6v4"/></svg></div>
+        <span class="nav-lbl">3. ラウドネス</span>
+        <div class="status-dot on"></div>
+      </div>
+      <div class="nav" onclick="show('dynamics',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 10 Q4 4 6 8 Q8 12 10 5 Q12 2 14 6"/></svg></div>
+        <span class="nav-lbl">4. ダイナミクス</span>
+        <div class="status-dot on"></div>
+      </div>
+      <div class="nav" onclick="show('bgm',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg></div>
+        <span class="nav-lbl">5. BGM</span>
+        <div class="status-dot on"></div>
+      </div>
+      <div class="nav" onclick="show('endscene',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="8" rx="1.5"/><path d="M6 14h4M8 11v3"/></svg></div>
+        <span class="nav-lbl">6. エンドシーン</span>
+        <div class="status-dot off"></div>
+      </div>
+      <div class="nav" onclick="show('silence',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2"/></svg></div>
+        <span class="nav-lbl">7. 無音カット</span>
+        <div class="status-dot off"></div>
+      </div>
+
+      <div class="sidebar-sep"></div>
+
+      <div class="sec-hdr">出力</div>
+      <div class="nav" onclick="show('export',this)">
+        <div class="nav-ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg></div>
+        <span class="nav-lbl">エクスポート</span>
+      </div>
+    </div>
+
+    <!-- Main panels -->
+    <div class="main">
+
+      <!-- SOURCE -->
+      <div class="panel" id="p-source">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#48484a,#2c2c2e)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="s-titles"><h2>音声ファイル</h2><p>処理する音声ファイルを選択</p></div>
+        </div>
+        <div class="dropzone" onclick="mockFile()">
+          <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="dz-title">音声ファイルをドロップ</div>
+          <div class="dz-sub">MP3 · WAV · M4A · AAC</div>
+          <div class="dz-divider">または</div>
+          <div class="dz-btn">ファイルを選択</div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          すべての処理はブラウザ内で完結します。ファイルはサーバーに送信されません。
+        </div>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="panel visible" id="p-overview">
+        <div class="s-hdr" style="margin-bottom:4px">
+          <div class="s-titles">
+            <h2 style="font-size:20px">処理パイプライン</h2>
+            <p>ステージをクリックして詳細設定を開く</p>
+          </div>
+        </div>
+        <div class="grp" style="overflow:visible;background:transparent;border:none;box-shadow:none">
+          <div class="pipe-row" onclick="show('trim',nthNav(2))">
+            <div class="pipe-num">1</div>
+            <div><div class="pipe-name">トリム</div><div class="pipe-desc">クラップ検出 · 前後カット</div></div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="show('denoise',nthNav(3))">
+            <div class="pipe-num">2</div>
+            <div><div class="pipe-name">ノイズ除去</div><div class="pipe-desc">Spectral モード · −50 dB</div></div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="show('loudness',nthNav(4))">
+            <div class="pipe-num">3</div>
+            <div><div class="pipe-name">ラウドネス正規化</div><div class="pipe-desc">目標 −16.0 LUFS · EBU R128</div></div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="show('dynamics',nthNav(5))">
+            <div class="pipe-num">4</div>
+            <div><div class="pipe-name">ダイナミクス</div><div class="pipe-desc">コンプレッサー 4:1 · リミッター −1 dB</div></div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="show('bgm',nthNav(6))">
+            <div class="pipe-num">5</div>
+            <div><div class="pipe-name">BGM</div><div class="pipe-desc">bgm-2024.mp3 · −44 LUFS</div></div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="show('endscene',nthNav(7))">
+            <div class="pipe-num">6</div>
+            <div><div class="pipe-name">エンドシーン</div><div class="pipe-desc">ファイル未設定</div></div>
+            <span class="pipe-tag off">OFF</span>
+          </div>
+          <div class="pipe-row" onclick="show('silence',nthNav(8))">
+            <div class="pipe-num">7</div>
+            <div><div class="pipe-name">無音カット</div><div class="pipe-desc">2 秒以上 → 0.5 秒に短縮</div></div>
+            <span class="pipe-tag off">OFF</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRIM -->
+      <div class="panel" id="p-trim">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#ff9f0a,#e06500)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="6" y1="9" x2="6" y2="3"/><line x1="18" y1="9" x2="18" y2="3"/><line x1="2" y1="17" x2="22" y2="17"/><path d="M6 9 L2 13"/><path d="M6 9 L10 13"/><path d="M18 9 L14 13"/><path d="M18 9 L22 13"/></svg>
+          </div>
+          <div class="s-titles"><h2>トリム</h2><p>クラップ音検出による前後カット</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">検出</div>
+          <div class="row">
+            <span class="row-lbl">クラップ検出閾値</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−30</span><div class="sl-track"><div class="sl-fill" style="width:70%"><div class="sl-thumb"></div></div></div><span class="sl-max">0</span></div></div>
+            <span class="row-val">−10 dB</span>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">余白</div>
+          <div class="row">
+            <span class="row-lbl">クラップ前の余白</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0s</span><div class="sl-track"><div class="sl-fill" style="width:17%"><div class="sl-thumb"></div></div></div><span class="sl-max">3s</span></div></div>
+            <span class="row-val">0.5 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">クラップ後カット</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0s</span><div class="sl-track"><div class="sl-fill" style="width:33%"><div class="sl-thumb"></div></div></div><span class="sl-max">3s</span></div></div>
+            <span class="row-val">1.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DENOISE -->
+      <div class="panel" id="p-denoise">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#30d158,#00862a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 12 Q5 4 8 12 Q11 20 14 12 Q17 4 20 8"/><path d="M20 8 L22 8"/></svg>
+          </div>
+          <div class="s-titles"><h2>ノイズ除去</h2><p>背景ノイズ・ヒス音のスペクトル除去</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">アルゴリズム</div>
+          <div class="row">
+            <span class="row-lbl">除去方式</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn" onclick="seg(this)">なし</div>
+                <div class="iseg-btn" onclick="seg(this)">afftdn</div>
+                <div class="iseg-btn" onclick="seg(this)">anlmdn</div>
+                <div class="iseg-btn active" onclick="seg(this)">Spectral</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">パラメータ</div>
+          <div class="row">
+            <span class="row-lbl">ノイズフロア閾値</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−70</span><div class="sl-track"><div class="sl-fill" style="width:55%"><div class="sl-thumb"></div></div></div><span class="sl-max">−20</span></div></div>
+            <span class="row-val">−50 dB</span>
+          </div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          Spectral モードは最高品質。速度を優先する場合は afftdn を選択してください。
+        </div>
+      </div>
+
+      <!-- LOUDNESS -->
+      <div class="panel" id="p-loudness">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#bf5af2,#7a00c8)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v20M8 6v12M4 9v6M16 5v14M20 8v8"/></svg>
+          </div>
+          <div class="s-titles"><h2>ラウドネス正規化</h2><p>EBU R128 準拠の音量標準化</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">ターゲット</div>
+          <div class="row">
+            <span class="row-lbl">目標ラウドネス</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−24</span><div class="sl-track"><div class="sl-fill" style="width:67%"><div class="sl-thumb"></div></div></div><span class="sl-max">−9</span></div></div>
+            <span class="row-val">−16.0 LUFS</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">True Peak</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−6</span><div class="sl-track"><div class="sl-fill" style="width:75%"><div class="sl-thumb"></div></div></div><span class="sl-max">0</span></div></div>
+            <span class="row-val">−1.5 dBTP</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">LRA</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">1</span><div class="sl-track"><div class="sl-fill" style="width:50%"><div class="sl-thumb"></div></div></div><span class="sl-max">20</span></div></div>
+            <span class="row-val">11.0 LU</span>
+          </div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          −16 LUFS はポッドキャスト標準。Spotify は −14 LUFS、Apple Podcasts は −16 LUFS 推奨。
+        </div>
+      </div>
+
+      <!-- DYNAMICS -->
+      <div class="panel" id="p-dynamics">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#ff453a,#a00000)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17 L7 7 L11 14 L14 5 L18 12 L21 8"/></svg>
+          </div>
+          <div class="s-titles"><h2>ダイナミクス</h2><p>コンプレッサーとリミッターで音量変動を制御</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">コンプレッサー</div>
+          <div class="row">
+            <span class="row-lbl">スレッショルド</span>
+            <div class="row-ctrl"><input class="field" value="-20dB" style="max-width:100px"/></div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">レシオ</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">1</span><div class="sl-track"><div class="sl-fill" style="width:22%"><div class="sl-thumb"></div></div></div><span class="sl-max">20</span></div></div>
+            <span class="row-val">4 : 1</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">アタック</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">1ms</span><div class="sl-track"><div class="sl-fill" style="width:20%"><div class="sl-thumb"></div></div></div><span class="sl-max">100ms</span></div></div>
+            <span class="row-val">5 ms</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">リリース</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">10ms</span><div class="sl-track"><div class="sl-fill" style="width:38%"><div class="sl-thumb"></div></div></div><span class="sl-max">500ms</span></div></div>
+            <span class="row-val">50 ms</span>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">リミッター</div>
+          <div class="row">
+            <span class="row-lbl">リミット</span>
+            <div class="row-ctrl"><input class="field" value="-1dB" style="max-width:100px"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BGM -->
+      <div class="panel" id="p-bgm">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#5ac8fa,#005aaa)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </div>
+          <div class="s-titles"><h2>BGM</h2><p>バックグラウンドミュージックの合成</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">BGMファイル</div>
+          <div class="row">
+            <span class="row-lbl">ファイル</span>
+            <div class="row-ctrl">
+              <div class="filechip">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>
+                bgm-2024.mp3
+              </div>
+            </div>
+            <div class="field-btn">変更</div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">URL 読み込み</span>
+            <div class="row-ctrl"><input class="field" placeholder="https://raw.githubusercontent.com/…"/></div>
+            <div class="field-btn">読み込む</div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">音量・フェード</div>
+          <div class="row">
+            <span class="row-lbl">目標音量</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−60</span><div class="sl-track"><div class="sl-fill" style="width:40%"><div class="sl-thumb"></div></div></div><span class="sl-max">−20</span></div></div>
+            <span class="row-val">−44 LUFS</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">フェードイン</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0s</span><div class="sl-track"><div class="sl-fill" style="width:30%"><div class="sl-thumb"></div></div></div><span class="sl-max">10s</span></div></div>
+            <span class="row-val">3.0 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">フェードアウト</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0s</span><div class="sl-track"><div class="sl-fill" style="width:30%"><div class="sl-thumb"></div></div></div><span class="sl-max">10s</span></div></div>
+            <span class="row-val">3.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ENDSCENE -->
+      <div class="panel" id="p-endscene">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#ffd60a,#c07800)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="13" rx="2"/><path d="M8 21h8M12 16v5"/></svg>
+          </div>
+          <div class="s-titles"><h2>エンドシーン</h2><p>末尾に定型クリップを追加</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle off" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="dropzone">
+          <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="dz-title">エンドシーンをドロップ</div>
+          <div class="dz-sub">MP3 · WAV 対応</div>
+          <div class="dz-btn">ファイルを選択</div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">クロスフェード</div>
+          <div class="row">
+            <span class="row-lbl">フェード時間</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0s</span><div class="sl-track"><div class="sl-fill" style="width:40%"><div class="sl-thumb"></div></div></div><span class="sl-max">5s</span></div></div>
+            <span class="row-val">2.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SILENCE -->
+      <div class="panel" id="p-silence">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#636366,#2c2c2e)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 9v6M12 5v14M15 9v6M3 12h3M18 12h3"/></svg>
+          </div>
+          <div class="s-titles"><h2>無音カット</h2><p>長い沈黙を短縮してテンポを改善</p></div>
+          <div class="tog-wrap"><span class="tog-lbl">有効</span><div class="toggle off" onclick="this.classList.toggle('off')"><div class="knob"></div></div></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">検出条件</div>
+          <div class="row">
+            <span class="row-lbl">無音判定閾値</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">−60</span><div class="sl-track"><div class="sl-fill" style="width:50%"><div class="sl-thumb"></div></div></div><span class="sl-max">−20</span></div></div>
+            <span class="row-val">−35 dB</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">最小無音時間</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0.5s</span><div class="sl-track"><div class="sl-fill" style="width:32%"><div class="sl-thumb"></div></div></div><span class="sl-max">10s</span></div></div>
+            <span class="row-val">2.0 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">カット後の長さ</span>
+            <div class="row-ctrl"><div class="slrow"><span class="sl-min">0.1s</span><div class="sl-track"><div class="sl-fill" style="width:20%"><div class="sl-thumb"></div></div></div><span class="sl-max">2s</span></div></div>
+            <span class="row-val">0.5 s</span>
+          </div>
+        </div>
+        <div class="notice warn">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM7.5 4.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          無音カットは処理時間が増加します。長尺ファイルでは特に注意が必要です。
+        </div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="panel" id="p-export">
+        <div class="s-hdr">
+          <div class="s-ico" style="background:linear-gradient(145deg,#0a84ff,#0040a0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v13M5 10l7 7 7-7"/><path d="M4 20h16"/></svg>
+          </div>
+          <div class="s-titles"><h2>エクスポート</h2><p>出力フォーマットとビットレートの設定</p></div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">フォーマット</div>
+          <div class="row">
+            <span class="row-lbl">出力形式</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn active" onclick="seg(this)">MP3</div>
+                <div class="iseg-btn" onclick="seg(this)">WAV</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">ビットレート</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn" onclick="seg(this)">128k</div>
+                <div class="iseg-btn active" onclick="seg(this)">192k</div>
+                <div class="iseg-btn" onclick="seg(this)">320k</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <div class="st-dot"></div>
+    <div class="st-txt" id="st">準備完了</div>
+    <div class="st-bar"><div class="st-fill" id="sf"></div></div>
+    <div class="st-right" id="sr">ファイル未選択</div>
+  </div>
+
+</div>
+
+<script>
+  const panels = document.querySelectorAll('.panel');
+  const navs   = document.querySelectorAll('.nav');
+
+  function show(id, row) {
+    panels.forEach(p => p.classList.remove('visible'));
+    navs.forEach(n => n.classList.remove('active'));
+    const p = document.getElementById('p-' + id);
+    if (p) p.classList.add('visible');
+    if (row && row.classList) row.classList.add('active');
+  }
+
+  function nthNav(n) {
+    return document.querySelectorAll('.nav')[n];
+  }
+
+  // wire sidebar
+  const map = ['source','overview','trim','denoise','loudness','dynamics','bgm','endscene','silence','export'];
+  navs.forEach((nav, i) => {
+    nav.addEventListener('click', () => show(map[i], nav));
+  });
+
+  // segmented controls
+  function seg(el) {
+    el.closest('.iseg,.seg').querySelectorAll('.iseg-btn,.seg-btn')
+      .forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // mock file select
+  function mockFile() {
+    document.getElementById('fbadge').textContent = '1';
+    document.getElementById('filechip').style.display = 'flex';
+    document.getElementById('st').textContent = '処理準備完了';
+    document.getElementById('sr').textContent = 'episode-001.wav  ·  00:58:32  ·  44.1 kHz';
+    show('overview', document.querySelectorAll('.nav')[1]);
+  }
+
+  // toolbar seg
+  document.querySelectorAll('.seg .seg-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      b.closest('.seg').querySelectorAll('.seg-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

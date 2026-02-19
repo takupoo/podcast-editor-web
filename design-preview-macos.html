@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Editor – macOS UI Mockup</title>
+  <style>
+    /* ─── macOS System Colors (Dark Mode) ──────────────────── */
+    :root {
+      --bg:              #1c1c1e;
+      --bg2:             #242426;
+      --bg3:             #2c2c2e;
+      --bg4:             #363638;
+      --separator:       rgba(255,255,255,0.08);
+      --border:          rgba(255,255,255,0.14);
+      --label:           rgba(255,255,255,0.88);
+      --label2:          rgba(255,255,255,0.55);
+      --label3:          rgba(255,255,255,0.28);
+      --label4:          rgba(255,255,255,0.14);
+      --accent:          #0a84ff;
+      --accent-light:    #409cff;
+      --green:           #30d158;
+      --orange:          #ff9f0a;
+      --yellow:          #ffd60a;
+      --red:             #ff453a;
+      --purple:          #bf5af2;
+      --teal:            #5ac8fa;
+      --font: -apple-system, "Helvetica Neue", sans-serif;
+      --mono: "SF Mono", "Menlo", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 48px 24px;
+    }
+
+    /* ─── WINDOW ─────────────────────────────────────────────── */
+    .window {
+      width: 980px;
+      height: 700px;
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.07),
+        0 0 0 1px rgba(0,0,0,0.5),
+        0 30px 80px rgba(0,0,0,0.85),
+        0 10px 30px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+      user-select: none;
+    }
+
+    /* ─── TITLE BAR ───────────────────────────────────────────── */
+    .titlebar {
+      height: 28px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--separator);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .traffic {
+      display: flex; gap: 8px; align-items: center; z-index: 1;
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .dot.close    { background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.15); }
+    .dot.minimize { background: #febc2e; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.15); }
+    .dot.zoom     { background: #28c840; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.15); }
+    .win-title {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: 13px; font-weight: 500; color: var(--label2);
+      letter-spacing: -.1px;
+    }
+
+    /* ─── TOOLBAR ─────────────────────────────────────────────── */
+    .toolbar {
+      height: 44px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--separator);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .spacer { flex: 1; }
+
+    /* Segmented control */
+    .seg {
+      display: flex;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 1px;
+    }
+    .seg-btn {
+      padding: 3px 14px;
+      font-size: 12px; font-weight: 500;
+      color: var(--label2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .12s;
+    }
+    .seg-btn.active {
+      background: rgba(255,255,255,0.11);
+      color: var(--label);
+    }
+
+    /* Toolbar button */
+    .tbtn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      font-size: 12px; font-weight: 500;
+      color: var(--label);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .tbtn:hover { background: rgba(255,255,255,0.09); }
+    .tbtn.primary {
+      background: var(--accent);
+      border-color: rgba(0,0,0,0.15);
+      color: #fff;
+    }
+    .tbtn.primary:hover { background: var(--accent-light); }
+    .tbtn svg { width: 13px; height: 13px; }
+
+    /* File chip */
+    .filechip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--label);
+    }
+    .filechip svg { width: 12px; height: 12px; color: var(--label2); }
+
+    /* ─── BODY ───────────────────────────────────────────────── */
+    .body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ─── SIDEBAR ─────────────────────────────────────────────── */
+    .sidebar {
+      width: 218px;
+      background: rgba(26,26,28,0.98);
+      border-right: 1px solid var(--separator);
+      display: flex;
+      flex-direction: column;
+      padding: 8px 0 12px;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    .sidebar::-webkit-scrollbar { width: 0; }
+
+    .sec-hdr {
+      padding: 8px 16px 3px;
+      font-size: 11px; font-weight: 600;
+      color: var(--label3);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .nav-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px;
+      margin: 1px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .nav-row:hover { background: rgba(255,255,255,0.05); }
+    .nav-row.active { background: var(--accent); }
+    .nav-row.active .nav-label { color: #fff; }
+    .nav-row.active .nav-icon  { color: #fff; }
+    .nav-row.active .dot-status.on  { background: rgba(255,255,255,0.8); }
+    .nav-row.active .dot-status.off { background: rgba(255,255,255,0.3); }
+
+    .nav-icon {
+      width: 16px; height: 16px;
+      color: var(--label2);
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-icon svg { width: 14px; height: 14px; }
+    .nav-label { font-size: 13px; color: var(--label); line-height: 1; }
+    .nav-badge { margin-left: auto; font-size: 11px; color: var(--label3); }
+    .dot-status {
+      width: 6px; height: 6px; border-radius: 50%;
+      margin-left: auto; flex-shrink: 0;
+    }
+    .dot-status.on  { background: var(--green); }
+    .dot-status.off { background: var(--label4); }
+    .dot-status.cur { background: var(--accent); }
+
+    .sidebar-sep {
+      height: 1px;
+      background: var(--separator);
+      margin: 8px 0;
+    }
+
+    /* ─── MAIN ──────────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      background: var(--bg);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .main::-webkit-scrollbar { width: 6px; }
+    .main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    .panel { padding: 20px 22px; display: none; }
+    .panel.visible { display: flex; flex-direction: column; gap: 16px; }
+
+    /* Stage header */
+    .stage-hdr {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .stage-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .stage-icon svg { width: 19px; height: 19px; color: #fff; }
+    .stage-titles h2 {
+      font-size: 17px; font-weight: 600;
+      color: var(--label);
+      letter-spacing: -.3px;
+    }
+    .stage-titles p {
+      font-size: 12px; color: var(--label2); margin-top: 2px;
+    }
+    .toggle-wrap {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toggle-lbl { font-size: 12px; color: var(--label2); }
+    .toggle {
+      width: 36px; height: 20px;
+      background: var(--green);
+      border-radius: 10px;
+      position: relative; cursor: pointer;
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    .toggle.off { background: rgba(255,255,255,0.15); }
+    .knob {
+      position: absolute;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px; left: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.4);
+      transition: left .2s;
+    }
+    .toggle.off .knob { left: 2px; }
+
+    /* Settings group */
+    .grp {
+      background: var(--bg2);
+      border: 1px solid var(--separator);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .grp-hdr {
+      padding: 9px 14px 5px;
+      font-size: 11px; font-weight: 600;
+      color: var(--label3);
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--separator);
+    }
+    .row {
+      display: flex; align-items: center;
+      padding: 10px 14px; gap: 12px;
+      border-bottom: 1px solid var(--separator);
+      min-height: 42px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-lbl {
+      font-size: 13px; color: var(--label);
+      min-width: 130px; flex-shrink: 0;
+    }
+    .row-ctrl { flex: 1; display: flex; align-items: center; gap: 10px; }
+    .row-val {
+      font-size: 12px; color: var(--label2);
+      font-family: var(--mono);
+      min-width: 64px; text-align: right;
+    }
+
+    /* Inline seg */
+    .iseg {
+      display: flex;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 2px; gap: 1px;
+    }
+    .iseg-btn {
+      padding: 3px 11px;
+      font-size: 12px; color: var(--label2);
+      border-radius: 5px; cursor: pointer;
+    }
+    .iseg-btn.active {
+      background: rgba(255,255,255,0.1);
+      color: var(--label);
+    }
+
+    /* Slider */
+    .slider-row { flex: 1; display: flex; align-items: center; gap: 8px; }
+    .slider-min, .slider-max {
+      font-size: 11px; color: var(--label3); flex-shrink: 0;
+    }
+    .slider-track {
+      flex: 1; height: 3px;
+      background: var(--bg4);
+      border-radius: 2px; position: relative;
+    }
+    .slider-fill {
+      height: 100%; background: var(--accent);
+      border-radius: 2px; position: relative;
+    }
+    .slider-thumb {
+      position: absolute;
+      width: 14px; height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 .5px rgba(0,0,0,.2), 0 2px 5px rgba(0,0,0,.45);
+      right: -7px; top: 50%; transform: translateY(-50%);
+    }
+
+    /* Text field */
+    .field {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 13px; color: var(--label);
+      font-family: var(--font);
+    }
+    .field::placeholder { color: var(--label3); }
+
+    /* Field + button */
+    .field-btn {
+      padding: 5px 12px;
+      font-size: 12px; font-weight: 500;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--label);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Drop zone */
+    .dropzone {
+      border: 1.5px dashed rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 28px 20px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 8px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .dropzone:hover {
+      border-color: var(--accent);
+      background: rgba(10,132,255,0.04);
+    }
+    .dz-icon { width: 36px; height: 36px; color: var(--label3); }
+    .dz-title { font-size: 14px; font-weight: 500; color: var(--label); }
+    .dz-sub { font-size: 12px; color: var(--label2); }
+    .dz-or { font-size: 11px; color: var(--label3); }
+    .dz-btn {
+      margin-top: 4px; padding: 5px 16px;
+      font-size: 12px; font-weight: 500;
+      background: var(--accent); color: #fff;
+      border-radius: 6px; cursor: pointer;
+    }
+
+    /* Notice */
+    .notice {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 10px 12px;
+      background: rgba(10,132,255,0.07);
+      border: 1px solid rgba(10,132,255,0.18);
+      border-radius: 8px;
+      font-size: 12px; color: var(--label2);
+      line-height: 1.5;
+    }
+    .notice svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+    .notice.warn { background: rgba(255,159,10,0.07); border-color: rgba(255,159,10,0.2); }
+    .notice.warn svg { color: var(--orange); }
+
+    /* Overview pipeline */
+    .pipeline {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .pipe-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .pipe-row:hover { background: var(--bg2); }
+    .pipe-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--bg3);
+      font-size: 11px; font-weight: 600;
+      color: var(--label2);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .pipe-num.active { background: var(--accent); color: #fff; }
+    .pipe-name { font-size: 13px; color: var(--label); }
+    .pipe-desc { font-size: 12px; color: var(--label2); margin-top: 1px; }
+    .pipe-tag {
+      margin-left: auto;
+      font-size: 11px; font-weight: 500;
+      padding: 2px 8px; border-radius: 4px;
+    }
+    .pipe-tag.on  { background: rgba(48,209,88,.12); color: var(--green); }
+    .pipe-tag.off { background: rgba(255,255,255,.06); color: var(--label3); }
+
+    /* ─── STATUS BAR ─────────────────────────────────────────── */
+    .statusbar {
+      height: 22px;
+      background: rgba(26,26,28,0.98);
+      border-top: 1px solid var(--separator);
+      display: flex; align-items: center;
+      padding: 0 14px; gap: 10px;
+      flex-shrink: 0;
+    }
+    .st-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .st-txt { font-size: 11px; color: var(--label2); }
+    .st-bar {
+      width: 140px; height: 2px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 1px;
+    }
+    .st-fill { height: 100%; width: 0; background: var(--accent); border-radius: 1px; }
+    .st-right { margin-left: auto; font-size: 11px; color: var(--label3); }
+  </style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- ── Title Bar ── -->
+  <div class="titlebar">
+    <div class="traffic">
+      <div class="dot close"></div>
+      <div class="dot minimize"></div>
+      <div class="dot zoom"></div>
+    </div>
+    <div class="win-title">Podcast Editor</div>
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="toolbar">
+    <div class="seg">
+      <div class="seg-btn active" onclick="switchMode('edit',this)">編集</div>
+      <div class="seg-btn"       onclick="switchMode('preview',this)">プレビュー</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="filechip" id="filechip" style="display:none">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
+      episode-001.wav
+    </div>
+    <div class="tbtn" onclick="alert('設定リセット')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
+      リセット
+    </div>
+    <div class="tbtn primary" onclick="alert('処理開始')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+      処理実行
+    </div>
+  </div>
+
+  <!-- ── Body ── -->
+  <div class="body">
+
+    <!-- ── Sidebar ── -->
+    <div class="sidebar">
+      <div class="sec-hdr">ソース</div>
+      <div class="nav-row" onclick="showPanel('source',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg></div>
+        <span class="nav-label">音声ファイル</span>
+        <span class="nav-badge" id="file-badge">未選択</span>
+      </div>
+
+      <div class="sidebar-sep"></div>
+
+      <div class="sec-hdr">処理ステージ</div>
+      <div class="nav-row active" onclick="showPanel('overview',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z"/></svg></div>
+        <span class="nav-label">概要</span>
+        <div class="dot-status cur"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('trim',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 4l2 2-2 2m4-4h6M3 10l2-2-2-2m4 4h6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <span class="nav-label">1. トリム</span>
+        <div class="dot-status on"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('denoise',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".7"/></svg></div>
+        <span class="nav-label">2. ノイズ除去</span>
+        <div class="dot-status on"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('loudness',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2v12M5 5v6M2 7v2m9-5v6m3-4v2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <span class="nav-label">3. ラウドネス</span>
+        <div class="dot-status on"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('dynamics',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 10 Q4 5 6 8 Q8 11 10 4 Q12 2 14 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <span class="nav-label">4. ダイナミクス</span>
+        <div class="dot-status on"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('bgm',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg></div>
+        <span class="nav-label">5. BGM</span>
+        <div class="dot-status on"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('endscene',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v8H2V3zm1 1v6h10V4H3zm0 8h10v1H3v-1z"/></svg></div>
+        <span class="nav-label">6. エンドシーン</span>
+        <div class="dot-status off"></div>
+      </div>
+      <div class="nav-row" onclick="showPanel('silence',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 8h3m6 0h3M8 3v3m0 4v3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <span class="nav-label">7. 無音カット</span>
+        <div class="dot-status off"></div>
+      </div>
+
+      <div class="sidebar-sep"></div>
+
+      <div class="sec-hdr">出力</div>
+      <div class="nav-row" onclick="showPanel('export',this)">
+        <div class="nav-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v9m-4-3 4 4 4-4M2 13h12v2H2v-2z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></div>
+        <span class="nav-label">エクスポート</span>
+      </div>
+    </div>
+
+    <!-- ── Panels ── -->
+    <div class="main">
+
+      <!-- SOURCE -->
+      <div class="panel" id="p-source">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#636366,#48484a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>音声ファイル</h2>
+            <p>処理対象の音声ファイルを選択してください</p>
+          </div>
+        </div>
+        <div class="dropzone" onclick="selectFile()">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="dz-title">音声ファイルをドロップ</div>
+          <div class="dz-sub">MP3・WAV・M4A・AAC 対応</div>
+          <div class="dz-or">または</div>
+          <div class="dz-btn">ファイルを選択</div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          <span>ファイルはブラウザ内で処理されます。サーバーへのアップロードは発生しません。</span>
+        </div>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="panel visible" id="p-overview">
+        <div class="stage-hdr" style="margin-bottom:4px">
+          <div class="stage-titles">
+            <h2 style="font-size:20px;letter-spacing:-.4px">処理パイプライン</h2>
+            <p>各ステージをクリックして設定を編集できます</p>
+          </div>
+        </div>
+        <div class="grp pipeline">
+          <div class="pipe-row" onclick="showPanel('trim', document.querySelector('.nav-row:nth-child(3)'))">
+            <div class="pipe-num">1</div>
+            <div>
+              <div class="pipe-name">トリム</div>
+              <div class="pipe-desc">クラップ検出による前後カット</div>
+            </div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('denoise', document.querySelector('.nav-row:nth-child(4)'))">
+            <div class="pipe-num">2</div>
+            <div>
+              <div class="pipe-name">ノイズ除去</div>
+              <div class="pipe-desc">Spectral モード（最高品質）</div>
+            </div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('loudness', document.querySelector('.nav-row:nth-child(5)'))">
+            <div class="pipe-num">3</div>
+            <div>
+              <div class="pipe-name">ラウドネス正規化</div>
+              <div class="pipe-desc">目標 −16.0 LUFS</div>
+            </div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('dynamics', document.querySelector('.nav-row:nth-child(6)'))">
+            <div class="pipe-num">4</div>
+            <div>
+              <div class="pipe-name">ダイナミクス</div>
+              <div class="pipe-desc">コンプレッサー + リミッター</div>
+            </div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('bgm', document.querySelector('.nav-row:nth-child(7)'))">
+            <div class="pipe-num">5</div>
+            <div>
+              <div class="pipe-name">BGM</div>
+              <div class="pipe-desc">bgm-2024.mp3 • −44 LUFS</div>
+            </div>
+            <span class="pipe-tag on">ON</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('endscene', document.querySelector('.nav-row:nth-child(8)'))">
+            <div class="pipe-num">6</div>
+            <div>
+              <div class="pipe-name">エンドシーン</div>
+              <div class="pipe-desc">ファイル未設定</div>
+            </div>
+            <span class="pipe-tag off">OFF</span>
+          </div>
+          <div class="pipe-row" onclick="showPanel('silence', document.querySelector('.nav-row:nth-child(9)'))">
+            <div class="pipe-num">7</div>
+            <div>
+              <div class="pipe-name">無音カット</div>
+              <div class="pipe-desc">2秒以上の無音を0.5秒に短縮</div>
+            </div>
+            <span class="pipe-tag off">OFF</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRIM -->
+      <div class="panel" id="p-trim">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#ff9f0a,#ff6b00)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9 L6 3 M6 9 L2 13 M6 9 L10 13 M18 9 L18 3 M18 9 L14 13 M18 9 L22 13 M2 17 h20"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>トリム</h2>
+            <p>クラップ音を検出して前後の不要部分をカット</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">検出設定</div>
+          <div class="row">
+            <span class="row-lbl">クラップ検出閾値</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−30</span>
+                <div class="slider-track"><div class="slider-fill" style="width:70%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">0</span>
+              </div>
+            </div>
+            <span class="row-val">−10 dB</span>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">余白設定</div>
+          <div class="row">
+            <span class="row-lbl">クラップ前の余白</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0</span>
+                <div class="slider-track"><div class="slider-fill" style="width:20%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">3s</span>
+              </div>
+            </div>
+            <span class="row-val">0.5 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">クラップ後カット</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0</span>
+                <div class="slider-track"><div class="slider-fill" style="width:33%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">3s</span>
+              </div>
+            </div>
+            <span class="row-val">1.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DENOISE -->
+      <div class="panel" id="p-denoise">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#30d158,#009e43)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12 Q5 4 8 12 Q11 20 14 12 Q17 4 20 8"/><path d="M20 8 L22 8"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>ノイズ除去</h2>
+            <p>環境ノイズ・エアコン音・ヒス音を除去</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">アルゴリズム</div>
+          <div class="row">
+            <span class="row-lbl">除去方式</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn" onclick="activateSeg(this)">なし</div>
+                <div class="iseg-btn" onclick="activateSeg(this)">afftdn</div>
+                <div class="iseg-btn" onclick="activateSeg(this)">anlmdn</div>
+                <div class="iseg-btn active" onclick="activateSeg(this)">Spectral</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">パラメータ</div>
+          <div class="row">
+            <span class="row-lbl">ノイズフロア閾値</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−70</span>
+                <div class="slider-track"><div class="slider-fill" style="width:55%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">−20</span>
+              </div>
+            </div>
+            <span class="row-val">−50 dB</span>
+          </div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          Spectral は最高品質ですが処理が遅くなります。速度優先なら afftdn を推奨。
+        </div>
+      </div>
+
+      <!-- LOUDNESS -->
+      <div class="panel" id="p-loudness">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#bf5af2,#8040c0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M8 6v12M4 9v6M16 5v14M20 8v8"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>ラウドネス正規化</h2>
+            <p>EBU R128 / ITU-R BS.1770 準拠の音量正規化</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">ターゲット</div>
+          <div class="row">
+            <span class="row-lbl">目標ラウドネス</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−24</span>
+                <div class="slider-track"><div class="slider-fill" style="width:67%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">−9</span>
+              </div>
+            </div>
+            <span class="row-val">−16.0 LUFS</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">True Peak</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−6</span>
+                <div class="slider-track"><div class="slider-fill" style="width:75%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">0</span>
+              </div>
+            </div>
+            <span class="row-val">−1.5 dBTP</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">LRA</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">1</span>
+                <div class="slider-track"><div class="slider-fill" style="width:50%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">20</span>
+              </div>
+            </div>
+            <span class="row-val">11.0 LU</span>
+          </div>
+        </div>
+        <div class="notice">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          −16 LUFS はポッドキャスト・YouTube 標準。Spotify は −14 LUFS 推奨。
+        </div>
+      </div>
+
+      <!-- DYNAMICS -->
+      <div class="panel" id="p-dynamics">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#ff453a,#c0392b)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17 L7 7 L11 14 L14 5 L18 12 L21 8"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>ダイナミクス処理</h2>
+            <p>コンプレッサーとリミッターで音量変動を整える</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">コンプレッサー</div>
+          <div class="row">
+            <span class="row-lbl">スレッショルド</span>
+            <div class="row-ctrl"><input class="field" value="-20dB" style="max-width:100px"/></div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">レシオ</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">1</span>
+                <div class="slider-track"><div class="slider-fill" style="width:50%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">20</span>
+              </div>
+            </div>
+            <span class="row-val">4 : 1</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">アタック</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">1ms</span>
+                <div class="slider-track"><div class="slider-fill" style="width:20%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">100ms</span>
+              </div>
+            </div>
+            <span class="row-val">5 ms</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">リリース</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">10ms</span>
+                <div class="slider-track"><div class="slider-fill" style="width:40%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">500ms</span>
+              </div>
+            </div>
+            <span class="row-val">50 ms</span>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">リミッター</div>
+          <div class="row">
+            <span class="row-lbl">リミット</span>
+            <div class="row-ctrl"><input class="field" value="-1dB" style="max-width:100px"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BGM -->
+      <div class="panel" id="p-bgm">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#5ac8fa,#007aff)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>BGM</h2>
+            <p>音声にバックグラウンドミュージックを合成</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">BGMファイル</div>
+          <div class="row">
+            <span class="row-lbl">ファイル</span>
+            <div class="row-ctrl">
+              <div class="filechip">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>
+                bgm-2024.mp3
+              </div>
+            </div>
+            <div class="field-btn">変更</div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">URL から読み込み</span>
+            <div class="row-ctrl">
+              <input class="field" placeholder="https://raw.githubusercontent.com/…"/>
+            </div>
+            <div class="field-btn">読み込む</div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">音量・フェード</div>
+          <div class="row">
+            <span class="row-lbl">目標音量</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−60</span>
+                <div class="slider-track"><div class="slider-fill" style="width:40%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">−20</span>
+              </div>
+            </div>
+            <span class="row-val">−44 LUFS</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">フェードイン</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0s</span>
+                <div class="slider-track"><div class="slider-fill" style="width:50%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">10s</span>
+              </div>
+            </div>
+            <span class="row-val">3.0 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">フェードアウト</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0s</span>
+                <div class="slider-track"><div class="slider-fill" style="width:50%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">10s</span>
+              </div>
+            </div>
+            <span class="row-val">3.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ENDSCENE -->
+      <div class="panel" id="p-endscene">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#ffd60a,#ff9f0a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>エンドシーン</h2>
+            <p>エピソード末尾に定型の音声クリップを追加</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle off" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="dropzone">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="dz-title">エンドシーンをドロップ</div>
+          <div class="dz-sub">MP3・WAV 対応</div>
+          <div class="dz-or">または</div>
+          <div class="dz-btn">ファイルを選択</div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">クロスフェード</div>
+          <div class="row">
+            <span class="row-lbl">フェード時間</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0s</span>
+                <div class="slider-track"><div class="slider-fill" style="width:40%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">5s</span>
+              </div>
+            </div>
+            <span class="row-val">2.0 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SILENCE -->
+      <div class="panel" id="p-silence">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#636366,#48484a)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 9v6M12 5v14M15 9v6M3 12h3M18 12h3"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>無音カット</h2>
+            <p>長い沈黙を短縮してテンポを改善</p>
+          </div>
+          <div class="toggle-wrap">
+            <span class="toggle-lbl">有効</span>
+            <div class="toggle off" onclick="this.classList.toggle('off')"><div class="knob"></div></div>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">検出条件</div>
+          <div class="row">
+            <span class="row-lbl">無音判定閾値</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">−60</span>
+                <div class="slider-track"><div class="slider-fill" style="width:50%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">−20</span>
+              </div>
+            </div>
+            <span class="row-val">−35 dB</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">最小無音時間</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0.5s</span>
+                <div class="slider-track"><div class="slider-fill" style="width:38%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">10s</span>
+              </div>
+            </div>
+            <span class="row-val">2.0 s</span>
+          </div>
+          <div class="row">
+            <span class="row-lbl">カット後の長さ</span>
+            <div class="row-ctrl">
+              <div class="slider-row">
+                <span class="slider-min">0.1s</span>
+                <div class="slider-track"><div class="slider-fill" style="width:20%"><div class="slider-thumb"></div></div></div>
+                <span class="slider-max">2s</span>
+              </div>
+            </div>
+            <span class="row-val">0.5 s</span>
+          </div>
+        </div>
+        <div class="notice warn">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM7.5 4.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+          無音カットは処理時間が増加します。長尺ファイルでは特に注意。
+        </div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="panel" id="p-export">
+        <div class="stage-hdr">
+          <div class="stage-icon" style="background:linear-gradient(135deg,#0a84ff,#005ec0)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M5 10l7 7 7-7"/><path d="M4 20h16"/></svg>
+          </div>
+          <div class="stage-titles">
+            <h2>エクスポート</h2>
+            <p>出力フォーマットとビットレートを設定</p>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="grp-hdr">フォーマット</div>
+          <div class="row">
+            <span class="row-lbl">出力形式</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn active" onclick="activateSeg(this)">MP3</div>
+                <div class="iseg-btn" onclick="activateSeg(this)">WAV</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-lbl">ビットレート</span>
+            <div class="row-ctrl">
+              <div class="iseg">
+                <div class="iseg-btn" onclick="activateSeg(this)">128k</div>
+                <div class="iseg-btn active" onclick="activateSeg(this)">192k</div>
+                <div class="iseg-btn" onclick="activateSeg(this)">320k</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /body -->
+
+  <!-- ── Status Bar ── -->
+  <div class="statusbar">
+    <div class="st-dot"></div>
+    <div class="st-txt" id="status-txt">準備完了</div>
+    <div class="st-bar"><div class="st-fill" id="status-fill"></div></div>
+    <div class="st-right" id="status-right">ファイル未選択</div>
+  </div>
+
+</div><!-- /window -->
+
+<script>
+  // ── Sidebar navigation ──────────────────────────────────
+  function showPanel(id, clickedRow) {
+    // hide all panels
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+    const panel = document.getElementById('p-' + id);
+    if (panel) panel.classList.add('visible');
+
+    // deactivate all nav rows
+    document.querySelectorAll('.nav-row').forEach(r => r.classList.remove('active'));
+
+    // activate clicked row (handle both element and event)
+    let row = clickedRow;
+    if (clickedRow instanceof Event) row = clickedRow.currentTarget;
+    if (row && row.classList) row.classList.add('active');
+
+    // show file in toolbar if source has a file
+    if (id === 'source') {
+      document.getElementById('file-badge').textContent = '未選択';
+    }
+  }
+
+  // Wire sidebar rows to panels
+  const mapping = [
+    ['source', 0], ['overview', 1],
+    ['trim', 2], ['denoise', 3], ['loudness', 4],
+    ['dynamics', 5], ['bgm', 6], ['endscene', 7],
+    ['silence', 8], ['export', 9],
+  ];
+  document.querySelectorAll('.nav-row').forEach((row, i) => {
+    row.addEventListener('click', () => {
+      showPanel(mapping[i][0], row);
+    });
+  });
+
+  // ── Segmented controls ───────────────────────────────────
+  function activateSeg(el) {
+    el.closest('.iseg,.seg').querySelectorAll('.iseg-btn,.seg-btn')
+      .forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // ── Toolbar mode switch ──────────────────────────────────
+  function switchMode(mode, el) {
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // ── Mock file select ─────────────────────────────────────
+  function selectFile() {
+    document.getElementById('file-badge').textContent = '1';
+    document.getElementById('filechip').style.display = 'flex';
+    document.getElementById('status-right').textContent = 'episode-001.wav  •  00:58:32  •  44.1 kHz';
+    document.getElementById('status-txt').textContent = '処理準備完了';
+    showPanel('overview', document.querySelector('.nav-row:nth-child(2)'));
+  }
+</script>
+</body>
+</html>

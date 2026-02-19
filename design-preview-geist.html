@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Editor – Vercel Geist</title>
+  <style>
+    /* ── Vercel Geist Design Tokens ────────────────────────────── */
+    :root {
+      /* Colors */
+      --geist-background: #fff;
+      --geist-foreground: #000;
+
+      /* Gray Scale (Accents) */
+      --geist-accents-1: #fafafa;
+      --geist-accents-2: #eaeaea;
+      --geist-accents-3: #999999;
+      --geist-accents-4: #888888;
+      --geist-accents-5: #666666;
+      --geist-accents-6: #444444;
+      --geist-accents-7: #333333;
+      --geist-accents-8: #111111;
+
+      /* Semantic Colors */
+      --geist-success: #0070f3;
+      --geist-success-light: #3291ff;
+      --geist-success-dark: #0761d1;
+      --geist-error: #ee0000;
+      --geist-error-light: #ff1a1a;
+      --geist-warning: #f5a623;
+      --geist-cyan: #50e3c2;
+
+      /* Typography */
+      --geist-font-sans: 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      --geist-font-mono: 'Geist Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+
+      /* Spacing (4px base) */
+      --geist-space-1: 4px;
+      --geist-space-2: 8px;
+      --geist-space-3: 12px;
+      --geist-space-4: 16px;
+      --geist-space-5: 20px;
+      --geist-space-6: 24px;
+      --geist-space-8: 32px;
+      --geist-space-10: 40px;
+      --geist-space-12: 48px;
+      --geist-space-16: 64px;
+
+      /* Shapes */
+      --geist-radius: 6px;
+      --geist-border-width: 1px;
+
+      /* Transitions */
+      --geist-transition: all 0.2s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--geist-font-sans);
+      font-size: 16px;
+      line-height: 1.5;
+      letter-spacing: -0.005625em;
+      color: var(--geist-foreground);
+      background: var(--geist-background);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    .geist-header {
+      height: 64px;
+      border-bottom: var(--geist-border-width) solid var(--geist-accents-2);
+      display: flex;
+      align-items: center;
+      padding: 0 var(--geist-space-6);
+      gap: var(--geist-space-4);
+      flex-shrink: 0;
+    }
+    .geist-logo {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--geist-foreground);
+    }
+
+    /* Icon Button */
+    .geist-icon-button {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--geist-radius);
+      border: var(--geist-border-width) solid var(--geist-accents-2);
+      background: var(--geist-background);
+      color: var(--geist-accents-5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--geist-transition);
+    }
+    .geist-icon-button:hover {
+      border-color: var(--geist-foreground);
+      color: var(--geist-foreground);
+    }
+
+    /* ── Body ────────────────────────────────────────────────── */
+    .geist-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .geist-sidebar {
+      width: 240px;
+      border-right: var(--geist-border-width) solid var(--geist-accents-2);
+      padding: var(--geist-space-6) 0;
+      flex-shrink: 0;
+      overflow-y: auto;
+      background: var(--geist-accents-1);
+    }
+    .geist-nav-item {
+      height: 36px;
+      padding: 0 var(--geist-space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--geist-space-2);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--geist-accents-6);
+      transition: var(--geist-transition);
+      margin: 0 var(--geist-space-2);
+      border-radius: var(--geist-radius);
+    }
+    .geist-nav-item svg {
+      width: 16px;
+      height: 16px;
+    }
+    .geist-nav-item:hover {
+      background: var(--geist-accents-2);
+      color: var(--geist-foreground);
+    }
+    .geist-nav-item.active {
+      background: var(--geist-foreground);
+      color: var(--geist-background);
+      font-weight: 500;
+    }
+
+    .geist-nav-divider {
+      height: var(--geist-border-width);
+      background: var(--geist-accents-2);
+      margin: var(--geist-space-3) var(--geist-space-4);
+    }
+
+    /* ── Main Content ────────────────────────────────────────── */
+    .geist-main {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--geist-space-10);
+      background: var(--geist-background);
+    }
+    .geist-main::-webkit-scrollbar { width: 8px; }
+    .geist-main::-webkit-scrollbar-track { background: transparent; }
+    .geist-main::-webkit-scrollbar-thumb { background: var(--geist-accents-3); border-radius: 4px; }
+
+    .geist-container {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--geist-space-8);
+    }
+
+    /* ── Typography ──────────────────────────────────────────── */
+    .geist-h1 {
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+      color: var(--geist-foreground);
+    }
+    .geist-h2 {
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+    .geist-h3 {
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .geist-h4 {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .geist-body {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--geist-foreground);
+    }
+    .geist-small {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--geist-accents-5);
+    }
+    .geist-caption {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--geist-accents-5);
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .geist-card {
+      background: var(--geist-background);
+      border: var(--geist-border-width) solid var(--geist-accents-2);
+      border-radius: var(--geist-radius);
+      overflow: hidden;
+      transition: var(--geist-transition);
+    }
+    .geist-card-header {
+      padding: var(--geist-space-4);
+      border-bottom: var(--geist-border-width) solid var(--geist-accents-2);
+    }
+    .geist-card-body {
+      padding: var(--geist-space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--geist-space-4);
+    }
+
+    /* ── Button ──────────────────────────────────────────────── */
+    .geist-button {
+      height: 32px;
+      padding: 0 var(--geist-space-3);
+      border-radius: var(--geist-radius);
+      font-family: var(--geist-font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.005625em;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--geist-space-2);
+      white-space: nowrap;
+      transition: var(--geist-transition);
+    }
+
+    /* Primary Button */
+    .geist-button-primary {
+      background: var(--geist-foreground);
+      color: var(--geist-background);
+    }
+    .geist-button-primary:hover {
+      opacity: 0.8;
+    }
+
+    /* Secondary Button (Outline) */
+    .geist-button-secondary {
+      background: transparent;
+      border: var(--geist-border-width) solid var(--geist-accents-2);
+      color: var(--geist-foreground);
+    }
+    .geist-button-secondary:hover {
+      border-color: var(--geist-foreground);
+    }
+
+    /* Success Button */
+    .geist-button-success {
+      background: var(--geist-success);
+      color: #fff;
+    }
+    .geist-button-success:hover {
+      background: var(--geist-success-dark);
+    }
+
+    /* Large Button */
+    .geist-button-large {
+      height: 40px;
+      padding: 0 var(--geist-space-4);
+      font-size: 16px;
+    }
+
+    /* ── Drop Zone ───────────────────────────────────────────── */
+    .geist-dropzone {
+      border: var(--geist-border-width) dashed var(--geist-accents-3);
+      border-radius: var(--geist-radius);
+      padding: var(--geist-space-8);
+      text-align: center;
+      cursor: pointer;
+      transition: var(--geist-transition);
+      background: var(--geist-accents-1);
+    }
+    .geist-dropzone:hover {
+      border-color: var(--geist-foreground);
+      background: var(--geist-background);
+    }
+    .geist-dropzone.active {
+      border-color: var(--geist-success);
+      border-style: solid;
+      background: rgba(0, 112, 243, 0.05);
+    }
+
+    /* ── Input ───────────────────────────────────────────────── */
+    .geist-input {
+      width: 100%;
+      height: 32px;
+      padding: 5px 8px;
+      border: var(--geist-border-width) solid var(--geist-accents-2);
+      border-radius: var(--geist-radius);
+      font-family: var(--geist-font-sans);
+      font-size: 14px;
+      color: var(--geist-foreground);
+      background: var(--geist-background);
+      transition: var(--geist-transition);
+    }
+    .geist-input:hover {
+      border-color: var(--geist-accents-4);
+    }
+    .geist-input:focus {
+      outline: none;
+      border-color: var(--geist-success);
+    }
+
+    /* ── Slider ──────────────────────────────────────────────── */
+    .geist-slider-row {
+      display: flex;
+      align-items: center;
+      gap: var(--geist-space-3);
+    }
+    .geist-slider-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--geist-foreground);
+      min-width: 180px;
+    }
+    .geist-slider-track {
+      flex: 1;
+      height: 4px;
+      background: var(--geist-accents-2);
+      border-radius: 2px;
+      position: relative;
+    }
+    .geist-slider-fill {
+      height: 100%;
+      background: var(--geist-foreground);
+      border-radius: 2px;
+      position: relative;
+    }
+    .geist-slider-thumb {
+      width: 12px;
+      height: 12px;
+      background: var(--geist-foreground);
+      border: 2px solid var(--geist-background);
+      box-shadow: 0 0 0 1px var(--geist-foreground);
+      border-radius: 50%;
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+    .geist-slider-value {
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--geist-font-mono);
+      color: var(--geist-foreground);
+      min-width: 100px;
+      text-align: right;
+    }
+
+    /* ── Toggle Switch ───────────────────────────────────────── */
+    .geist-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .geist-toggle {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--geist-accents-3);
+      position: relative;
+      cursor: pointer;
+      transition: var(--geist-transition);
+    }
+    .geist-toggle-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--geist-background);
+      border-radius: 50%;
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      transition: var(--geist-transition);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .geist-toggle.checked {
+      background: var(--geist-foreground);
+    }
+    .geist-toggle.checked .geist-toggle-thumb {
+      left: 21px;
+    }
+
+    /* ── Progress Bar ────────────────────────────────────────── */
+    .geist-progress {
+      height: 4px;
+      background: var(--geist-accents-2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .geist-progress-bar {
+      height: 100%;
+      background: var(--geist-foreground);
+      transition: width 0.3s ease;
+    }
+
+    /* ── List ────────────────────────────────────────────────── */
+    .geist-list-item {
+      min-height: 48px;
+      padding: var(--geist-space-3) var(--geist-space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--geist-space-3);
+      border-bottom: var(--geist-border-width) solid var(--geist-accents-2);
+    }
+    .geist-list-item:last-child {
+      border-bottom: none;
+    }
+    .geist-list-item-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .geist-list-item-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .geist-list-item-title {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .geist-list-item-desc {
+      font-size: 12px;
+      color: var(--geist-accents-5);
+    }
+
+    /* ── Badge ───────────────────────────────────────────────── */
+    .geist-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--geist-accents-2);
+      color: var(--geist-foreground);
+    }
+    .geist-badge.success {
+      background: rgba(0, 112, 243, 0.1);
+      color: var(--geist-success);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="geist-header">
+  <div class="geist-logo">Podcast Editor</div>
+  <div style="flex:1"></div>
+  <button class="geist-icon-button">
+    <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16">
+      <path d="M8 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM1.5 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm13 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Body -->
+<div class="geist-body">
+
+  <!-- Sidebar -->
+  <div class="geist-sidebar">
+    <div class="geist-nav-item active" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 00.5.5h4a.5.5 0 00.5-.5v-7a.5.5 0 00-.146-.354L13 5.793V2.5a.5.5 0 00-.5-.5h-1a.5.5 0 00-.5.5v1.293L8.354 1.146a.5.5 0 00-.708 0l-7 7A.5.5 0 001 8.5v6a.5.5 0 00.5.5h4a.5.5 0 00.5-.5z"/>
+      </svg>
+      <span>ホーム</span>
+    </div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M4 0a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V2a2 2 0 00-2-2H4zm0 1h8a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1z"/>
+      </svg>
+      <span>ファイル</span>
+    </div>
+    <div class="geist-nav-divider"></div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm.93-9.412l-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 110-2 1 1 0 010 2z"/>
+      </svg>
+      <span>プレビュー</span>
+    </div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+      </svg>
+      <span>処理</span>
+    </div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0zM8 0a8 8 0 100 16A8 8 0 008 0zm.5 4.75a.75.75 0 00-1.5 0v3.5a.75.75 0 00.471.696l2.5 1a.75.75 0 00.557-1.392L8.5 7.742V4.75z"/>
+      </svg>
+      <span>ミックス</span>
+    </div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M.5 9.9a.5.5 0 01.5.5v2.5a1 1 0 001 1h12a1 1 0 001-1v-2.5a.5.5 0 011 0v2.5a2 2 0 01-2 2H2a2 2 0 01-2-2v-2.5a.5.5 0 01.5-.5z"/><path d="M7.646 11.854a.5.5 0 00.708 0l3-3a.5.5 0 00-.708-.708L8.5 10.293V1.5a.5.5 0 00-1 0v8.793L5.354 8.146a.5.5 0 10-.708.708l3 3z"/>
+      </svg>
+      <span>エクスポート</span>
+    </div>
+    <div class="geist-nav-divider"></div>
+    <div class="geist-nav-item" onclick="setActive(this)">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 01-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 01.872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 012.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 012.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 01.872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 01-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 01-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 100-5.86 2.929 2.929 0 000 5.858z"/>
+      </svg>
+      <span>設定</span>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="geist-main">
+    <div class="geist-container">
+
+      <!-- Page Header -->
+      <div>
+        <h1 class="geist-h1" style="margin-bottom:8px">ポッドキャスト処理</h1>
+        <p class="geist-small">2人の音声ファイルを自動でミックス・編集します</p>
+      </div>
+
+      <!-- File Upload Card -->
+      <div class="geist-card">
+        <div class="geist-card-header">
+          <h2 class="geist-h4">音声ファイル</h2>
+        </div>
+        <div class="geist-card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--geist-space-4)">
+            <div class="geist-dropzone">
+              <svg style="width:40px;height:40px;color:var(--geist-accents-4);margin-bottom:var(--geist-space-3)" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M.5 9.9a.5.5 0 01.5.5v2.5a1 1 0 001 1h12a1 1 0 001-1v-2.5a.5.5 0 011 0v2.5a2 2 0 01-2 2H2a2 2 0 01-2-2v-2.5a.5.5 0 01.5-.5z"/><path d="M7.646 1.146a.5.5 0 01.708 0l3 3a.5.5 0 01-.708.708L8.5 2.707V11.5a.5.5 0 01-1 0V2.707L5.354 4.854a.5.5 0 11-.708-.708l3-3z"/>
+              </svg>
+              <div class="geist-h4" style="margin-bottom:4px">話者 A</div>
+              <div class="geist-small">ドロップまたはクリック</div>
+              <div class="geist-caption" style="margin-top:4px">MP3 · WAV · M4A</div>
+            </div>
+            <div class="geist-dropzone">
+              <svg style="width:40px;height:40px;color:var(--geist-accents-4);margin-bottom:var(--geist-space-3)" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M.5 9.9a.5.5 0 01.5.5v2.5a1 1 0 001 1h12a1 1 0 001-1v-2.5a.5.5 0 011 0v2.5a2 2 0 01-2 2H2a2 2 0 01-2-2v-2.5a.5.5 0 01.5-.5z"/><path d="M7.646 1.146a.5.5 0 01.708 0l3 3a.5.5 0 01-.708.708L8.5 2.707V11.5a.5.5 0 01-1 0V2.707L5.354 4.854a.5.5 0 11-.708-.708l3-3z"/>
+              </svg>
+              <div class="geist-h4" style="margin-bottom:4px">話者 B</div>
+              <div class="geist-small">ドロップまたはクリック</div>
+              <div class="geist-caption" style="margin-top:4px">MP3 · WAV · M4A</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Settings Card -->
+      <div class="geist-card">
+        <div class="geist-card-header">
+          <h2 class="geist-h4">処理設定</h2>
+        </div>
+        <div class="geist-card-body">
+
+          <!-- Preview mode -->
+          <div class="geist-toggle-row">
+            <div>
+              <div class="geist-h4">プレビューモード</div>
+              <div class="geist-small" style="margin-top:2px">最初の30秒のみ処理</div>
+            </div>
+            <div class="geist-toggle" onclick="this.classList.toggle('checked')">
+              <div class="geist-toggle-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Denoise -->
+          <div class="geist-toggle-row">
+            <div>
+              <div class="geist-h4">ノイズ除去</div>
+              <div class="geist-small" style="margin-top:2px">Spectral gating モード</div>
+            </div>
+            <div class="geist-toggle checked" onclick="this.classList.toggle('checked')">
+              <div class="geist-toggle-thumb"></div>
+            </div>
+          </div>
+
+          <!-- Target LUFS Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--geist-space-2)">
+              <div class="geist-h4">目標ラウドネス</div>
+              <div class="geist-slider-value">-16.0 LUFS</div>
+            </div>
+            <div class="geist-slider-row">
+              <span class="geist-caption">-24</span>
+              <div class="geist-slider-track">
+                <div class="geist-slider-fill" style="width:53%">
+                  <div class="geist-slider-thumb"></div>
+                </div>
+              </div>
+              <span class="geist-caption">-9</span>
+            </div>
+          </div>
+
+          <!-- Compression Ratio Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--geist-space-2)">
+              <div class="geist-h4">コンプレッサー比率</div>
+              <div class="geist-slider-value">4 : 1</div>
+            </div>
+            <div class="geist-slider-row">
+              <span class="geist-caption">2</span>
+              <div class="geist-slider-track">
+                <div class="geist-slider-fill" style="width:25%">
+                  <div class="geist-slider-thumb"></div>
+                </div>
+              </div>
+              <span class="geist-caption">10</span>
+            </div>
+          </div>
+
+          <!-- BGM LUFS Slider -->
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:var(--geist-space-2)">
+              <div class="geist-h4">BGM音量</div>
+              <div class="geist-slider-value">-44 LUFS</div>
+            </div>
+            <div class="geist-slider-row">
+              <span class="geist-caption">-60</span>
+              <div class="geist-slider-track">
+                <div class="geist-slider-fill" style="width:40%">
+                  <div class="geist-slider-thumb"></div>
+                </div>
+              </div>
+              <span class="geist-caption">-20</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display:flex;justify-content:center;gap:var(--geist-space-3)">
+        <button class="geist-button geist-button-secondary">
+          リセット
+        </button>
+        <button class="geist-button geist-button-success geist-button-large">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16">
+            <path d="M11.596 8.697l-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 010 1.393z"/>
+          </svg>
+          処理実行
+        </button>
+      </div>
+
+      <!-- Processing Progress Card (hidden initially) -->
+      <div class="geist-card" style="display:none">
+        <div class="geist-card-body">
+          <div style="display:flex;justify-content:space-between;margin-bottom:var(--geist-space-3)">
+            <div class="geist-h4">ノイズ除去中</div>
+            <div class="geist-h4">65%</div>
+          </div>
+          <div class="geist-progress">
+            <div class="geist-progress-bar" style="width:65%"></div>
+          </div>
+          <p class="geist-small" style="text-align:center;margin-top:var(--geist-space-3)">
+            Spectral gating を適用しています...
+          </p>
+        </div>
+      </div>
+
+      <!-- Pipeline List Card -->
+      <div class="geist-card">
+        <div class="geist-card-header">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 class="geist-h4">処理パイプライン</h2>
+            <span class="geist-badge success">6ステージ</span>
+          </div>
+        </div>
+        <div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">トリム</div>
+              <div class="geist-list-item-desc">クラップ検出・前後カット</div>
+            </div>
+          </div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">ノイズ除去</div>
+              <div class="geist-list-item-desc">Spectral gating · -50 dB</div>
+            </div>
+          </div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">ラウドネス正規化</div>
+              <div class="geist-list-item-desc">目標 -16.0 LUFS · EBU R128</div>
+            </div>
+          </div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">ダイナミクス処理</div>
+              <div class="geist-list-item-desc">コンプレッサー 4:1 · リミッター</div>
+            </div>
+          </div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">ミックス</div>
+              <div class="geist-list-item-desc">2チャンネル結合 · BGM追加 (-44 LUFS)</div>
+            </div>
+          </div>
+          <div class="geist-list-item">
+            <svg class="geist-list-item-icon" viewBox="0 0 16 16" fill="var(--geist-success)">
+              <path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/>
+            </svg>
+            <div class="geist-list-item-content">
+              <div class="geist-list-item-title">エクスポート</div>
+              <div class="geist-list-item-desc">MP3 192kbps · ステレオ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.geist-nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
