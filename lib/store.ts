@@ -10,11 +10,11 @@ interface AppState {
   updateConfig: (updates: Partial<ProcessConfig>) => void;
   resetConfig: () => void;
 
-  // ファイル
-  fileA: File | null;
-  fileB: File | null;
-  setFileA: (file: File | null) => void;
-  setFileB: (file: File | null) => void;
+  // ファイル（複数対応）
+  files: File[];
+  setFiles: (files: File[]) => void;
+  addFiles: (newFiles: File[]) => void;
+  removeFile: (index: number) => void;
 
   // 処理状態
   processing: boolean;
@@ -42,11 +42,17 @@ export const useAppStore = create<AppState>()(
         })),
       resetConfig: () => set({ config: DEFAULT_CONFIG }),
 
-      // ファイル
-      fileA: null,
-      fileB: null,
-      setFileA: (file) => set({ fileA: file }),
-      setFileB: (file) => set({ fileB: file }),
+      // ファイル（複数対応）
+      files: [],
+      setFiles: (files) => set({ files }),
+      addFiles: (newFiles) =>
+        set((state) => ({
+          files: [...state.files, ...newFiles],
+        })),
+      removeFile: (index) =>
+        set((state) => ({
+          files: state.files.filter((_, i) => i !== index),
+        })),
 
       // 処理状態
       processing: false,

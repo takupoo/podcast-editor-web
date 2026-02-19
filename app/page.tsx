@@ -125,7 +125,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) 
 
 // ── Main ───────────────────────────────────────────────────────
 export default function Home() {
-  const { config, fileA, fileB, setFileA, setFileB, resetConfig } = useAppStore();
+  const { config, files, setFiles, removeFile, resetConfig } = useAppStore();
   const [mounted, setMounted]       = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>('source');
   const [processing, setProcessing] = useState(false);
@@ -146,18 +146,35 @@ export default function Home() {
   }, []);
 
   const notify = (title: string, body: string) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/favicon.ico' });
+    console.log('notify called:', { title, body, permission: Notification.permission });
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        try {
+          const notification = new Notification(title, {
+            body,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: 'podcast-processor',
+          });
+          console.log('Notification created:', notification);
+        } catch (error) {
+          console.error('Failed to create notification:', error);
+        }
+      } else {
+        console.log('Notification permission not granted:', Notification.permission);
+      }
+    } else {
+      console.log('Notification API not supported');
     }
   };
 
   const handleProcess = async () => {
-    if (!fileA || !fileB) return;
+    if (files.length < 2) return;
     setProcessing(true);
     setResult(null);
     setProgress(null);
     try {
-      const output = await processPodcast(fileA, fileB, config, p => setProgress(p));
+      const output = await processPodcast(files[0], files[1], config, p => setProgress(p));
       setResult(output);
       notify('処理完了！', 'ポッドキャストの編集が完了しました。');
     } catch (error) {
@@ -178,7 +195,7 @@ export default function Home() {
     } catch { alert('URLのコピーに失敗しました'); }
   };
 
-  const canProcess = !!fileA && !!fileB && !processing;
+  const canProcess = files.length >= 2 && !processing;
 
   const processLabel = processing
     ? '処理中...'
@@ -190,15 +207,13 @@ export default function Home() {
     ? (progress?.message ?? '処理中...')
     : result
       ? '処理完了'
-      : fileA && fileB
+      : files.length >= 2
         ? '処理準備完了'
         : '準備完了';
 
-  const fileInfoText = fileA && fileB
-    ? `${fileA.name}  ·  ${fileB.name}`
-    : fileA
-      ? fileA.name
-      : 'ファイル未選択';
+  const fileInfoText = files.length > 0
+    ? files.map(f => f.name).join('  ·  ')
+    : 'ファイル未選択';
 
   // ── Sidebar nav sections ────────────────────────────────────
   const SOURCE_NAV: NavSection = { id: 'source', label: '音声ファイル', dot: 'none' };
@@ -215,7 +230,7 @@ export default function Home() {
               <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>音声ファイル</h2>
               <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>処理対象の音声ファイルを選択（話者A・B）</p>
             </div>
-            <FileUploader fileA={fileA} fileB={fileB} onFileAChange={setFileA} onFileBChange={setFileB} />
+            <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
             <div className="tg-notice">
               <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
               <span>すべての処理はブラウザ内で完結します。ファイルはサーバーに送信されません。</span>
@@ -295,7 +310,7 @@ export default function Home() {
           <div style={{ flex: 1 }} />
 
           {/* File badge */}
-          {(fileA || fileB) && (
+          {files.length > 0 && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '4px 12px',
@@ -308,7 +323,7 @@ export default function Home() {
             }}>
               <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {fileA ? fileA.name : ''}{fileA && fileB ? ' · ' : ''}{fileB ? fileB.name : ''}
+                {files.length}個のファイル
               </span>
             </div>
           )}
@@ -354,9 +369,9 @@ export default function Home() {
                 <NavIcon id="source" />
               </div>
               <span style={{ fontSize: 13, color: activeSection === 'source' ? 'var(--tg-t1)' : 'var(--tg-t2)' }}>音声ファイル</span>
-              {(fileA || fileB) && (
+              {files.length > 0 && (
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--tg-t3)' }}>
-                  {[fileA, fileB].filter(Boolean).length}
+                  {files.length}
                 </span>
               )}
             </button>
