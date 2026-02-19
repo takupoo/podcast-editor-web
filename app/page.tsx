@@ -276,7 +276,7 @@ export default function Home() {
           <div style={{
             fontSize: 16, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px',
           }}>
-            Podcast Editor
+            Spectratrek
           </div>
         </div>
 
