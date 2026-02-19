@@ -66,6 +66,7 @@ export type ProcessStage =
   | 'denoise'
   | 'loudness'
   | 'dynamics'
+  | 'processing'  // 統合処理（Denoise + Loudness + Dynamics）
   | 'mix'
   | 'silence'
   | 'bgm'

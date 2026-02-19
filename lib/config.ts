@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
 
   // Stage 2: Denoise
   denoise_enabled: true,  // デフォルトON
-  denoise_method: 'spectral', // デフォルト: spectral（最高品質）
+  denoise_method: 'afftdn', // デフォルト: afftdn（高速・高品質）
   noise_gate_threshold: -50.0, // ノイズフロア閾値（-60～-30dB）
 
   // Stage 3: Loudness

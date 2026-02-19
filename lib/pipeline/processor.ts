@@ -136,111 +136,182 @@ export async function processPodcast(
     await safeDelete(ffmpeg, 'input_a.mp3');
     await safeDelete(ffmpeg, 'input_b.mp3');
 
-    // Stage 2: Denoise（ノイズ除去）
-    if (config.denoise_enabled) {
+    // Stage 2-4: 統合処理（Denoise + Loudness + Dynamics）
+    // spectral 以外の場合は3つのステージを1つのFFmpegコマンドにまとめて高速化
+    const canUseUnified = !config.denoise_enabled ||
+                         (config.denoise_method !== 'spectral' && config.denoise_method !== 'anlmdn');
+
+    if (canUseUnified) {
+      // 統合処理パス（afftdn, none の場合）
       onProgress({
-        stage: 'denoise',
+        stage: 'processing',
         percent: 20,
-        message: `ノイズを除去中（${config.denoise_method}）...`,
+        message: '音声を処理中（統合フィルタ）...',
       });
 
-      const prevA = currentFileA, prevB = currentFileB;
-      await applyDenoise(
+      // フィルタチェーンの構築
+      const filterParts: string[] = [];
+
+      // Denoise（有効な場合）
+      if (config.denoise_enabled && config.denoise_method === 'afftdn') {
+        const nr = Math.round(Math.max(10, Math.min(80, ((-config.noise_gate_threshold - 30) / 10) * 23.3)));
+        filterParts.push(
+          'highpass=f=80',
+          `afftdn=nr=${nr}:nf=-25:tn=1`,
+          'lowpass=f=12000'
+        );
+      } else if (config.denoise_enabled && config.denoise_method === 'none') {
+        filterParts.push('highpass=f=80', 'lowpass=f=12000');
+      }
+
+      // Loudness（単パス）
+      filterParts.push(
+        `loudnorm=I=${config.target_lufs}:TP=${config.true_peak}:LRA=${config.lra}`
+      );
+
+      // Dynamics
+      const dbToLinear = (dbStr: string): number => {
+        const db = parseFloat(dbStr.replace(/dB$/i, ''));
+        return Math.pow(10, db / 20);
+      };
+      const thresholdLinear = dbToLinear(config.comp_threshold);
+      const limitLinear = dbToLinear(config.limiter_limit);
+      filterParts.push(
+        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}`,
+        `alimiter=limit=${limitLinear}`
+      );
+
+      const unifiedFilter = filterParts.join(',');
+      console.log('[Processor] 統合フィルタ:', unifiedFilter);
+
+      // 話者A
+      onProgress({
+        stage: 'processing',
+        percent: 30,
+        message: '話者Aを処理中...',
+      });
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFileA,
+        '-af', unifiedFilter,
+        '-ar', '48000',
+        'processed_a.wav',
+      ], 'Unified:A');
+      await safeDelete(ffmpeg, currentFileA);
+
+      // 話者B
+      onProgress({
+        stage: 'processing',
+        percent: 50,
+        message: '話者Bを処理中...',
+      });
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFileB,
+        '-af', unifiedFilter,
+        '-ar', '48000',
+        'processed_b.wav',
+      ], 'Unified:B');
+      await safeDelete(ffmpeg, currentFileB);
+    } else {
+      // 従来の分離処理パス（spectral, anlmdn の場合）
+      // Stage 2: Denoise（ノイズ除去）
+      if (config.denoise_enabled) {
+        onProgress({
+          stage: 'denoise',
+          percent: 20,
+          message: `ノイズを除去中（${config.denoise_method}）...`,
+        });
+
+        const prevA = currentFileA, prevB = currentFileB;
+        await applyDenoise(
+          ffmpeg,
+          currentFileA,
+          'denoised_a.wav',
+          config.denoise_method,
+          config.noise_gate_threshold
+        );
+        await safeDelete(ffmpeg, prevA);
+
+        await applyDenoise(
+          ffmpeg,
+          currentFileB,
+          'denoised_b.wav',
+          config.denoise_method,
+          config.noise_gate_threshold
+        );
+        await safeDelete(ffmpeg, prevB);
+
+        currentFileA = 'denoised_a.wav';
+        currentFileB = 'denoised_b.wav';
+      }
+
+      // Stage 3: Loudness正規化（単パス）
+      onProgress({
+        stage: 'loudness',
+        percent: 30,
+        message: 'ラウドネスを調整中...',
+      });
+      await normalizeLoudness(
         ffmpeg,
         currentFileA,
-        'denoised_a.wav',
-        config.denoise_method,
-        config.noise_gate_threshold
+        'loud_a.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        true // 常に単パス
       );
-      await safeDelete(ffmpeg, prevA);
+      await safeDelete(ffmpeg, currentFileA);
 
-      await applyDenoise(
+      onProgress({
+        stage: 'loudness',
+        percent: 40,
+        message: 'ラウドネスを調整中...',
+      });
+      await normalizeLoudness(
         ffmpeg,
         currentFileB,
-        'denoised_b.wav',
-        config.denoise_method,
-        config.noise_gate_threshold
+        'loud_b.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        true // 常に単パス
       );
-      await safeDelete(ffmpeg, prevB);
+      await safeDelete(ffmpeg, currentFileB);
 
-      currentFileA = 'denoised_a.wav';
-      currentFileB = 'denoised_b.wav';
+      // Stage 4: Dynamics処理
+      onProgress({
+        stage: 'dynamics',
+        percent: 50,
+        message: 'ダイナミクスを処理中（話者A）...',
+      });
+      await applyDynamics(
+        ffmpeg,
+        'loud_a.wav',
+        'processed_a.wav',
+        config.comp_threshold,
+        config.comp_ratio,
+        config.comp_attack,
+        config.comp_release,
+        config.limiter_limit
+      );
+      await safeDelete(ffmpeg, 'loud_a.wav');
+
+      onProgress({
+        stage: 'dynamics',
+        percent: 60,
+        message: 'ダイナミクスを処理中（話者B）...',
+      });
+      await applyDynamics(
+        ffmpeg,
+        'loud_b.wav',
+        'processed_b.wav',
+        config.comp_threshold,
+        config.comp_ratio,
+        config.comp_attack,
+        config.comp_release,
+        config.limiter_limit
+      );
+      await safeDelete(ffmpeg, 'loud_b.wav');
     }
-
-    // Stage 3: Loudness正規化
-    // プレビューモード: 単パス（高速・精度低） / 通常モード: 2パス（高精度）
-    const loudnessSinglePass = config.preview_mode === true;
-
-    onProgress({
-      stage: 'loudness',
-      percent: 30,
-      message: loudnessSinglePass
-        ? 'ラウドネスを調整中（高速モード）...'
-        : 'ラウドネスを計測中（話者A）...',
-    });
-    await normalizeLoudness(
-      ffmpeg,
-      currentFileA,
-      'loud_a.wav',
-      config.target_lufs,
-      config.true_peak,
-      config.lra,
-      loudnessSinglePass
-    );
-    await safeDelete(ffmpeg, currentFileA);
-
-    onProgress({
-      stage: 'loudness',
-      percent: 40,
-      message: loudnessSinglePass
-        ? 'ラウドネスを調整中（高速モード）...'
-        : 'ラウドネスを計測中（話者B）...',
-    });
-    await normalizeLoudness(
-      ffmpeg,
-      currentFileB,
-      'loud_b.wav',
-      config.target_lufs,
-      config.true_peak,
-      config.lra,
-      loudnessSinglePass
-    );
-    await safeDelete(ffmpeg, currentFileB);
-
-    // Stage 4: Dynamics処理
-    onProgress({
-      stage: 'dynamics',
-      percent: 50,
-      message: 'ダイナミクスを処理中（話者A）...',
-    });
-    await applyDynamics(
-      ffmpeg,
-      'loud_a.wav',
-      'processed_a.wav',
-      config.comp_threshold,
-      config.comp_ratio,
-      config.comp_attack,
-      config.comp_release,
-      config.limiter_limit
-    );
-    await safeDelete(ffmpeg, 'loud_a.wav');
-
-    onProgress({
-      stage: 'dynamics',
-      percent: 60,
-      message: 'ダイナミクスを処理中（話者B）...',
-    });
-    await applyDynamics(
-      ffmpeg,
-      'loud_b.wav',
-      'processed_b.wav',
-      config.comp_threshold,
-      config.comp_ratio,
-      config.comp_attack,
-      config.comp_release,
-      config.limiter_limit
-    );
-    await safeDelete(ffmpeg, 'loud_b.wav');
 
     // Stage 5: ボイスミックス
     onProgress({
