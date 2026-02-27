@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ProcessConfig, ProcessProgress } from './pipeline/types';
+import { ProcessConfig, ProcessProgress, CutRegion } from './pipeline/types';
 import { DEFAULT_CONFIG } from './config';
 import { loadConfigFromUrl, mergeConfigWithDefaults } from './config-url';
 
@@ -9,6 +9,11 @@ interface AppState {
   config: ProcessConfig;
   updateConfig: (updates: Partial<ProcessConfig>) => void;
   resetConfig: () => void;
+
+  // 手動カット区間
+  addCutRegion: (region: Omit<CutRegion, 'id'>) => void;
+  removeCutRegion: (id: string) => void;
+  clearCutRegions: () => void;
 
   // ファイル（複数対応）
   files: File[];
@@ -41,6 +46,27 @@ export const useAppStore = create<AppState>()(
           config: { ...state.config, ...updates },
         })),
       resetConfig: () => set({ config: DEFAULT_CONFIG }),
+
+      // 手動カット区間
+      addCutRegion: (region) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            cut_regions: [...state.config.cut_regions, { ...region, id: crypto.randomUUID() }]
+              .sort((a, b) => a.startTime - b.startTime),
+          },
+        })),
+      removeCutRegion: (id) =>
+        set((state) => ({
+          config: {
+            ...state.config,
+            cut_regions: state.config.cut_regions.filter((r) => r.id !== id),
+          },
+        })),
+      clearCutRegions: () =>
+        set((state) => ({
+          config: { ...state.config, cut_regions: [] },
+        })),
 
       // ファイル（複数対応）
       files: [],

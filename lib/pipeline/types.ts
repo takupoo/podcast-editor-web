@@ -2,6 +2,12 @@
  * 処理パイプラインの型定義
  */
 
+export interface CutRegion {
+  id: string;
+  startTime: number;  // 秒（生ファイル基準）
+  endTime: number;
+}
+
 export interface ProcessConfig {
   // Preview Mode
   preview_mode: boolean;         // プレビューモード（最初のN秒のみ処理）
@@ -49,6 +55,9 @@ export interface ProcessConfig {
   silence_min_duration: number;        // この秒数以上の無音をカット対象にする（秒）
   silence_target_duration: number;     // カット後の無音の長さ（秒）例: 0.5
 
+  // Manual Cut（手動カット）
+  cut_regions: CutRegion[];            // 手動カット区間リスト
+
   // Stage 8: Export
   mp3_bitrate: string;           // '192k'
   output_format: 'mp3' | 'wav';
@@ -63,6 +72,7 @@ export interface ProcessProgress {
 export type ProcessStage =
   | 'loading'
   | 'trim'
+  | 'cut'
   | 'denoise'
   | 'loudness'
   | 'dynamics'

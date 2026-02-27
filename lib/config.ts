@@ -41,6 +41,9 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   silence_min_duration: 2.0,           // 2秒以上の無音をカット対象
   silence_target_duration: 0.5,        // カット後は0.5秒に詰める
 
+  // Manual Cut（手動カット）
+  cut_regions: [],
+
   // Stage 8: Export
   mp3_bitrate: '192k',
   output_format: 'mp3',

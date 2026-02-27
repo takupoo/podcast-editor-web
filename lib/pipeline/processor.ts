@@ -8,6 +8,7 @@ import { normalizeLoudness } from './loudness';
 import { applyDynamics } from './dynamics';
 import { mixVoices, addBGM, appendEndscene, exportMP3 } from './mix';
 import { trimSilence } from './silence';
+import { applyCutRegions } from './cut';
 import { execFF } from './exec';
 
 /**
@@ -93,7 +94,7 @@ export async function processPodcast(
       message: 'クラップを検出中...',
     });
 
-    await applySyncAndTrim(
+    const trimResult = await applySyncAndTrim(
       ffmpeg,
       'trimmed_a.wav',
       'trimmed_b.wav',
@@ -130,6 +131,35 @@ export async function processPodcast(
 
       currentFileA = 'preview_a.wav';
       currentFileB = 'preview_b.wav';
+    }
+
+    // Stage 1.5: 手動カット（カット区間がある場合のみ）
+    if (config.cut_regions.length > 0) {
+      onProgress({
+        stage: 'cut',
+        percent: 17,
+        message: '手動カット区間を除去中...',
+      });
+
+      // トリムオフセット: 両トラックで大きい方を使用（生ファイル基準→トリム後基準の変換）
+      const trimOffset = Math.max(trimResult.cutA, trimResult.cutB);
+
+      const prevA = currentFileA;
+      const prevB = currentFileB;
+      await applyCutRegions(
+        ffmpeg,
+        currentFileA,
+        currentFileB,
+        'cut_a.wav',
+        'cut_b.wav',
+        config.cut_regions,
+        trimOffset
+      );
+      await safeDelete(ffmpeg, prevA);
+      await safeDelete(ffmpeg, prevB);
+
+      currentFileA = 'cut_a.wav';
+      currentFileB = 'cut_b.wav';
     }
 
     // 入力ファイルを削除してWASMメモリを解放

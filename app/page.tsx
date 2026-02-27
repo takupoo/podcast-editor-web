@@ -8,6 +8,7 @@ import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
+import { CutEditor } from '@/components/CutEditor';
 
 // SSR時のHydrationエラーを防ぐためSSRを無効化
 import type { ConfigSection } from '@/components/ConfigPanel';
@@ -22,6 +23,7 @@ type SectionId =
   | 'overview'
   | 'preview'
   | 'trim'
+  | 'cut'
   | 'processing'
   | 'silence'
   | 'mix'
@@ -37,6 +39,7 @@ const STAGES: NavSection[] = [
   { id: 'overview',    label: '概要',              dot: 'none' },
   { id: 'preview',     label: '🚀 プレビュー',     dot: 'none' },
   { id: 'trim',        label: '1. トリム',          dot: 'on'   },
+  { id: 'cut',         label: '1.5 手動カット',     dot: 'none' },
   { id: 'processing',  label: '2–4. 音声処理',     dot: 'on'   },
   { id: 'silence',     label: '5. 無音カット',      dot: 'off'  },
   { id: 'mix',         label: '6. BGM・エンドシーン', dot: 'on' },
@@ -55,6 +58,8 @@ function NavIcon({ id }: { id: SectionId }) {
       return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>;
     case 'trim':
       return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>;
+    case 'cut':
+      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>;
     case 'processing':
       return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>;
     case 'silence':
@@ -263,6 +268,8 @@ export default function Home() {
         );
       case 'overview':
         return <OverviewPanel onNavigate={navigate} />;
+      case 'cut':
+        return <CutEditor />;
       default:
         return (
           <ConfigPanel activeSection={activeSection} />
