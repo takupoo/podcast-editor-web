@@ -15,13 +15,53 @@ function parseTime(str: string): number | null {
   return parseInt(match[1]) * 60 + parseInt(match[2]);
 }
 
-function computeWaveformPeaks(audioBuffer: AudioBuffer, numSamples: number): Float32Array {
+/**
+ * クラップ音を検出（trim.ts と同じアルゴリズム、メモリ効率化版）
+ * 先頭300秒のみ分析し、RMSを逐次計算して早期リターン
+ */
+function detectClap(audioBuffer: AudioBuffer, thresholdDb: number = -10.0): number {
   const channelData = audioBuffer.getChannelData(0);
-  const blockSize = Math.floor(channelData.length / numSamples);
+  const sampleRate = audioBuffer.sampleRate;
+  const maxSamples = Math.min(channelData.length, Math.floor(sampleRate * 300));
+  const windowSize = Math.floor((5 * sampleRate) / 1000);
+
+  // 分析範囲内のピーク振幅を検出
+  let peak = 0;
+  for (let i = 0; i < maxSamples; i++) {
+    const abs = Math.abs(channelData[i]);
+    if (abs > peak) peak = abs;
+  }
+
+  const threshold = peak * Math.pow(10, thresholdDb / 20);
+
+  // RMS を逐次計算し、閾値を超えた時点で即リターン
+  const searchEnd = Math.min(maxSamples, channelData.length - windowSize);
+  for (let i = 0; i < searchEnd; i++) {
+    let sum = 0;
+    for (let j = 0; j < windowSize; j++) {
+      sum += channelData[i + j] ** 2;
+    }
+    if (Math.sqrt(sum / windowSize) > threshold) {
+      return i / sampleRate;
+    }
+  }
+  return 0; // クラップ未検出時は先頭から
+}
+
+function computeWaveformPeaks(
+  audioBuffer: AudioBuffer,
+  numSamples: number,
+  offsetSeconds: number = 0,
+): Float32Array {
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+  const startSample = Math.floor(offsetSeconds * sampleRate);
+  const totalSamples = channelData.length - startSample;
+  const blockSize = Math.floor(totalSamples / numSamples);
   const peaks = new Float32Array(numSamples);
   for (let i = 0; i < numSamples; i++) {
     let max = 0;
-    const start = i * blockSize;
+    const start = startSample + i * blockSize;
     const end = Math.min(start + blockSize, channelData.length);
     for (let j = start; j < end; j++) {
       const abs = Math.abs(channelData[j]);
@@ -87,6 +127,9 @@ export function CutEditor() {
   const [markIn, setMarkIn] = useState<number | null>(null);
   const [timeInput, setTimeInput] = useState('0:00');
   const [peaks, setPeaks] = useState<Float32Array | null>(null);
+  // クラップ同期オフセット（各トラックの開始位置）
+  const syncOffsetA = useRef(0);
+  const syncOffsetB = useRef(0);
 
   const fileA = files[0] ?? null;
   const fileB = files[1] ?? null;
@@ -111,9 +154,9 @@ export function CutEditor() {
     return () => URL.revokeObjectURL(url);
   }, [fileB]);
 
-  // Decode waveform data (both tracks → merged into single peaks)
+  // Decode waveform + clap detection → synced merged peaks
   useEffect(() => {
-    if (!fileA || !fileB) { setPeaks(null); return; }
+    if (!fileA || !fileB) { setPeaks(null); setDuration(0); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -123,15 +166,39 @@ export function CutEditor() {
           fileB.arrayBuffer().then(b => ctx.decodeAudioData(b)),
         ]);
         if (cancelled) { ctx.close(); return; }
-        const dur = Math.max(bufA.duration, bufB.duration);
-        const numSamples = Math.max(Math.floor(dur * PPS), 100);
-        const pA = computeWaveformPeaks(bufA, numSamples);
-        const pB = computeWaveformPeaks(bufB, numSamples);
-        if (!cancelled) setPeaks(mergePeaks(pA, pB));
+
+        // クラップ検出 → 同期オフセット計算（trim.ts と同じロジック）
+        const clapA = detectClap(bufA, config.clap_threshold_db);
+        const clapB = detectClap(bufB, config.clap_threshold_db);
+        let offA: number, offB: number;
+        if (config.post_clap_cut > 0) {
+          offA = clapA + config.post_clap_cut;
+          offB = clapB + config.post_clap_cut;
+        } else {
+          offA = Math.max(0, clapA - config.pre_clap_margin);
+          offB = Math.max(0, clapB - config.pre_clap_margin);
+        }
+        syncOffsetA.current = offA;
+        syncOffsetB.current = offB;
+        console.log(`[CutEditor] クラップ検出: A=${clapA.toFixed(3)}s→offset ${offA.toFixed(3)}s, B=${clapB.toFixed(3)}s→offset ${offB.toFixed(3)}s`);
+
+        // 同期後の長さ（短い方に合わせる）
+        const syncDur = Math.min(bufA.duration - offA, bufB.duration - offB);
+        const numSamples = Math.max(Math.floor(syncDur * PPS), 100);
+
+        // 同期位置からの波形ピークを計算・合成
+        const pA = computeWaveformPeaks(bufA, numSamples, offA);
+        const pB = computeWaveformPeaks(bufB, numSamples, offB);
+
+        if (!cancelled) {
+          setPeaks(mergePeaks(pA, pB));
+          setDuration(syncDur);
+        }
         ctx.close();
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileA, fileB]);
 
   // Draw waveform
@@ -143,27 +210,23 @@ export function CutEditor() {
     }
   }, [peaks, timelineWidth]);
 
-  // Audio events from track A (primary time source)
+  // Audio events from track A
   useEffect(() => {
     const audio = audioRefA.current;
     if (!audio) return;
-    const onLoaded = () => setDuration(audio.duration);
     const onEnded = () => setIsPlaying(false);
-    audio.addEventListener('loadedmetadata', onLoaded);
     audio.addEventListener('ended', onEnded);
-    return () => {
-      audio.removeEventListener('loadedmetadata', onLoaded);
-      audio.removeEventListener('ended', onEnded);
-    };
+    return () => audio.removeEventListener('ended', onEnded);
   }, [audioUrlA]);
 
-  // rAF-based time update for smooth playhead
+  // rAF-based time update for smooth playhead (synced time = raw time - offset)
   useEffect(() => {
     const tick = () => {
       const audio = audioRefA.current;
       if (audio && !audio.paused) {
-        setCurrentTime(audio.currentTime);
-        setTimeInput(formatTime(audio.currentTime));
+        const syncTime = Math.max(0, audio.currentTime - syncOffsetA.current);
+        setCurrentTime(syncTime);
+        setTimeInput(formatTime(syncTime));
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -186,8 +249,9 @@ export function CutEditor() {
 
   const seekTo = useCallback((time: number) => {
     const clamped = Math.max(0, Math.min(time, duration));
-    if (audioRefA.current) audioRefA.current.currentTime = clamped;
-    if (audioRefB.current) audioRefB.current.currentTime = clamped;
+    // 同期時間 → 各トラックの生ファイル時間に変換
+    if (audioRefA.current) audioRefA.current.currentTime = syncOffsetA.current + clamped;
+    if (audioRefB.current) audioRefB.current.currentTime = syncOffsetB.current + clamped;
     setCurrentTime(clamped);
     setTimeInput(formatTime(clamped));
   }, [duration]);
@@ -195,23 +259,40 @@ export function CutEditor() {
   const togglePlay = useCallback(() => {
     const a = audioRefA.current;
     const b = audioRefB.current;
-    if (!a) return;
+    if (!a || !duration) return;
     if (isPlaying) {
       a.pause();
       b?.pause();
       setIsPlaying(false);
     } else {
-      // Sync B to A before play
-      if (b) b.currentTime = a.currentTime;
+      // 同期オフセットを反映した位置で再生開始
+      const syncTime = Math.max(0, a.currentTime - syncOffsetA.current);
+      a.currentTime = syncOffsetA.current + syncTime;
+      if (b) b.currentTime = syncOffsetB.current + syncTime;
       a.play();
       b?.play();
       setIsPlaying(true);
     }
-  }, [isPlaying]);
+  }, [isPlaying, duration]);
 
   const skip = useCallback((delta: number) => {
     seekTo(currentTime + delta);
   }, [currentTime, seekTo]);
+
+  // スペースキーで再生/停止
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        // テキスト入力中は無視
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay]);
 
   const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -621,7 +702,7 @@ export function CutEditor() {
         <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>
         </svg>
-        <span>カット区間は両トラック（A・B）に同時に適用されます。同期トリム後の時間に自動補正されます。</span>
+        <span>クラップ音で自動同期済みの音声を表示しています。カット区間は両トラックに同時に適用されます。スペースキーで再生/停止。</span>
       </div>
     </div>
   );

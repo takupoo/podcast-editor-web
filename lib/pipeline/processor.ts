@@ -141,8 +141,8 @@ export async function processPodcast(
         message: '手動カット区間を除去中...',
       });
 
-      // トリムオフセット: 両トラックで大きい方を使用（生ファイル基準→トリム後基準の変換）
-      const trimOffset = Math.max(trimResult.cutA, trimResult.cutB);
+      // CutEditorで同期済み座標でマークされるため、オフセット補正は不要
+      const trimOffset = 0;
 
       const prevA = currentFileA;
       const prevB = currentFileB;
