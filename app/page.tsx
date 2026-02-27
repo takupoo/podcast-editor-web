@@ -86,7 +86,7 @@ export default function Home() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState<ProcessProgress | null>(null);
   const [result, setResult]         = useState<Blob | null>(null);
-  const [copied, setCopied]         = useState(false);
+
   const [notifPerm, setNotifPerm]   = useState<NotificationPermission>('default');
 
   useEffect(() => setMounted(true), []);
@@ -141,15 +141,6 @@ export default function Home() {
     }
   };
 
-  const handleShareConfig = async () => {
-    const { generateShareUrl } = await import('@/lib/config-url');
-    const url = generateShareUrl(config);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { alert('URLのコピーに失敗しました'); }
-  };
 
   const handleDownload = () => {
     if (!result) return;
@@ -313,16 +304,6 @@ export default function Home() {
               </span>
             </div>
           )}
-
-          {/* Share config */}
-          <button className="tg-btn" onClick={handleShareConfig}>
-            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6.5 8.5L9.5 5.5M6.5 5.5L9.5 8.5"/>
-              <path d="M9 4H11C12.1 4 13 4.9 13 6V6C13 7.1 12.1 8 11 8H11"/>
-              <path d="M7 8H5C3.9 8 3 8.9 3 10V10C3 11.1 3.9 12 5 12H7"/>
-            </svg>
-            {copied ? '✓ コピー済み' : 'URL'}
-          </button>
 
           {/* Reset */}
           <button className="tg-btn" onClick={resetConfig}>

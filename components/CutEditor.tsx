@@ -51,7 +51,9 @@ function detectClap(audioBuffer: AudioBuffer, thresholdDb: number = -10.0): numb
 const RULER_HEIGHT = 24;
 const TRACK_HEIGHT = 60;
 const TRACK_LABEL_WIDTH = 60;
-const PPS = 20;
+const MIN_PPS = 1;
+const MAX_PPS = 40;
+const TICK_CANDIDATES = [1, 2, 5, 10, 15, 30, 60, 120, 300];
 
 export function CutEditor() {
   const { files, config, addCutRegion, removeCutRegion, clearCutRegions } = useAppStore();
@@ -69,6 +71,8 @@ export function CutEditor() {
   const [markIn, setMarkIn] = useState<number | null>(null);
   const [timeInput, setTimeInput] = useState('0:00');
   const [syncing, setSyncing] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [pps, setPps] = useState(MIN_PPS);
   // クラップ同期オフセット（各トラックの開始位置）
   const syncOffsetA = useRef(0);
   const syncOffsetB = useRef(0);
@@ -76,9 +80,32 @@ export function CutEditor() {
   const fileA = files[0] ?? null;
   const fileB = files[1] ?? null;
 
+  const fitPps = useMemo(() => {
+    if (!duration || !containerWidth) return MIN_PPS;
+    return Math.max(MIN_PPS, Math.min(MAX_PPS, (containerWidth - TRACK_LABEL_WIDTH) / duration));
+  }, [duration, containerWidth]);
+
+  // containerWidth or duration が変わったら fitPps にリセット
+  useEffect(() => {
+    if (fitPps > 0) setPps(fitPps);
+  }, [fitPps]);
+
+  // ResizeObserver でコンテナ幅を監視
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const timelineWidth = useMemo(
-    () => Math.max(duration * PPS, 1),
-    [duration],
+    () => Math.max(duration * pps, 1),
+    [duration, pps],
   );
 
   // Audio URL management
@@ -170,13 +197,13 @@ export function CutEditor() {
     if (!isPlaying) return;
     const container = scrollContainerRef.current;
     if (!container) return;
-    const headX = currentTime * PPS + TRACK_LABEL_WIDTH;
+    const headX = currentTime * pps + TRACK_LABEL_WIDTH;
     const { scrollLeft, clientWidth } = container;
     const margin = clientWidth * 0.2;
     if (headX < scrollLeft + margin || headX > scrollLeft + clientWidth - margin) {
       container.scrollLeft = headX - clientWidth / 2;
     }
-  }, [currentTime, isPlaying]);
+  }, [currentTime, isPlaying, pps]);
 
   const seekTo = useCallback((time: number) => {
     const clamped = Math.max(0, Math.min(time, duration));
@@ -243,7 +270,7 @@ export function CutEditor() {
     if (!container || !duration) return;
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left + container.scrollLeft - TRACK_LABEL_WIDTH;
-    const time = x / PPS;
+    const time = x / pps;
     seekTo(time);
   };
 
@@ -267,16 +294,16 @@ export function CutEditor() {
 
   const handleCancelMark = () => setMarkIn(null);
 
-  // Ruler tick marks (fixed 10s interval)
+  // Ruler tick marks (PPS に応じて動的間隔)
   const rulerTicks = useMemo(() => {
     if (!duration) return [];
-    const interval = 10;
+    const interval = TICK_CANDIDATES.find(c => c * pps >= 60) ?? 300;
     const ticks: { time: number; x: number }[] = [];
     for (let t = 0; t <= duration; t += interval) {
-      ticks.push({ time: t, x: t * PPS });
+      ticks.push({ time: t, x: t * pps });
     }
     return ticks;
-  }, [duration]);
+  }, [duration, pps]);
 
   if (!fileA || !fileB) {
     return (
@@ -295,7 +322,7 @@ export function CutEditor() {
     );
   }
 
-  const playheadX = currentTime * PPS;
+  const playheadX = currentTime * pps;
 
   return (
     <div className="p-6 flex flex-col gap-4">
@@ -405,6 +432,34 @@ export function CutEditor() {
             }}
           />
           <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>/ {formatTime(duration)}</span>
+
+          {/* Zoom controls */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              className="tg-btn"
+              onClick={() => setPps(p => Math.max(MIN_PPS, p / 1.5))}
+              style={{ fontSize: 12, padding: '4px 6px', minWidth: 24 }}
+            >−</button>
+            <input
+              type="range"
+              min={Math.log(MIN_PPS)}
+              max={Math.log(MAX_PPS)}
+              step={0.01}
+              value={Math.log(pps)}
+              onChange={e => setPps(Math.exp(Number(e.target.value)))}
+              style={{ width: 80, accentColor: 'var(--tg-accent)' }}
+            />
+            <button
+              className="tg-btn"
+              onClick={() => setPps(p => Math.min(MAX_PPS, p * 1.5))}
+              style={{ fontSize: 12, padding: '4px 6px', minWidth: 24 }}
+            >+</button>
+            <button
+              className="tg-btn"
+              onClick={() => setPps(fitPps)}
+              style={{ fontSize: 10, padding: '4px 8px' }}
+            >全体</button>
+          </div>
         </div>
 
         {/* Mark controls */}
@@ -513,8 +568,8 @@ export function CutEditor() {
                     key={region.id}
                     style={{
                       position: 'absolute',
-                      left: region.startTime * PPS,
-                      width: (region.endTime - region.startTime) * PPS,
+                      left: region.startTime * pps,
+                      width: (region.endTime - region.startTime) * pps,
                       top: 0, bottom: 0,
                       background: 'rgba(255,59,48,0.25)',
                       borderLeft: '1px solid rgba(255,59,48,0.6)',
@@ -527,8 +582,8 @@ export function CutEditor() {
                 {markIn !== null && duration > 0 && (
                   <div style={{
                     position: 'absolute',
-                    left: Math.min(markIn, currentTime) * PPS,
-                    width: Math.abs(currentTime - markIn) * PPS,
+                    left: Math.min(markIn, currentTime) * pps,
+                    width: Math.abs(currentTime - markIn) * pps,
                     top: 0, bottom: 0,
                     background: 'rgba(255,159,10,0.2)',
                     borderLeft: '2px solid rgba(255,159,10,0.8)',
