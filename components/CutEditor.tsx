@@ -55,20 +55,27 @@ function drawWaveform(
   }
 }
 
+/** 2つのピーク配列を合成（各サンプルの最大値） */
+function mergePeaks(a: Float32Array, b: Float32Array): Float32Array {
+  const len = Math.min(a.length, b.length);
+  const merged = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    merged[i] = Math.max(a[i], b[i]);
+  }
+  return merged;
+}
+
 const RULER_HEIGHT = 24;
-const TRACK_HEIGHT = 80;
+const TRACK_HEIGHT = 100;
 const TRACK_LABEL_WIDTH = 60;
-const MIN_PPS = 5;
-const MAX_PPS = 200;
-const DEFAULT_PPS = 20;
+const PPS = 20;
 
 export function CutEditor() {
   const { files, config, addCutRegion, removeCutRegion, clearCutRegions } = useAppStore();
 
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
-  const canvasRefA = useRef<HTMLCanvasElement>(null);
-  const canvasRefB = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
 
@@ -78,17 +85,15 @@ export function CutEditor() {
   const [audioUrlA, setAudioUrlA] = useState<string | null>(null);
   const [audioUrlB, setAudioUrlB] = useState<string | null>(null);
   const [markIn, setMarkIn] = useState<number | null>(null);
-  const [pixelsPerSecond, setPixelsPerSecond] = useState(DEFAULT_PPS);
   const [timeInput, setTimeInput] = useState('0:00');
-  const [peaksA, setPeaksA] = useState<Float32Array | null>(null);
-  const [peaksB, setPeaksB] = useState<Float32Array | null>(null);
+  const [peaks, setPeaks] = useState<Float32Array | null>(null);
 
   const fileA = files[0] ?? null;
   const fileB = files[1] ?? null;
 
   const timelineWidth = useMemo(
-    () => Math.max(duration * pixelsPerSecond, 1),
-    [duration, pixelsPerSecond],
+    () => Math.max(duration * PPS, 1),
+    [duration],
   );
 
   // Audio URL management
@@ -106,79 +111,37 @@ export function CutEditor() {
     return () => URL.revokeObjectURL(url);
   }, [fileB]);
 
-  // Decode waveform data
+  // Decode waveform data (both tracks → merged into single peaks)
   useEffect(() => {
-    if (!fileA) { setPeaksA(null); return; }
+    if (!fileA || !fileB) { setPeaks(null); return; }
     let cancelled = false;
-    const ctx = new AudioContext();
-    fileA.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
-      if (cancelled) return;
-      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
-      setPeaksA(computeWaveformPeaks(audioBuffer, numSamples));
-    }).catch(() => {});
-    return () => { cancelled = true; ctx.close(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileA]);
+    (async () => {
+      try {
+        const ctx = new AudioContext();
+        const [bufA, bufB] = await Promise.all([
+          fileA.arrayBuffer().then(b => ctx.decodeAudioData(b)),
+          fileB.arrayBuffer().then(b => ctx.decodeAudioData(b)),
+        ]);
+        if (cancelled) { ctx.close(); return; }
+        const dur = Math.max(bufA.duration, bufB.duration);
+        const numSamples = Math.max(Math.floor(dur * PPS), 100);
+        const pA = computeWaveformPeaks(bufA, numSamples);
+        const pB = computeWaveformPeaks(bufB, numSamples);
+        if (!cancelled) setPeaks(mergePeaks(pA, pB));
+        ctx.close();
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [fileA, fileB]);
 
+  // Draw waveform
   useEffect(() => {
-    if (!fileB) { setPeaksB(null); return; }
-    let cancelled = false;
-    const ctx = new AudioContext();
-    fileB.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
-      if (cancelled) return;
-      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
-      setPeaksB(computeWaveformPeaks(audioBuffer, numSamples));
-    }).catch(() => {});
-    return () => { cancelled = true; ctx.close(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileB]);
-
-  // Recompute peaks when zoom changes (reuse decoded data is complex, so we just resample)
-  useEffect(() => {
-    if (!peaksA || !duration) return;
-    // Re-decode for new zoom level
-    if (!fileA) return;
-    let cancelled = false;
-    const ctx = new AudioContext();
-    fileA.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
-      if (cancelled) return;
-      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
-      setPeaksA(computeWaveformPeaks(audioBuffer, numSamples));
-    }).catch(() => {});
-    return () => { cancelled = true; ctx.close(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pixelsPerSecond]);
-
-  useEffect(() => {
-    if (!peaksB || !duration) return;
-    if (!fileB) return;
-    let cancelled = false;
-    const ctx = new AudioContext();
-    fileB.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
-      if (cancelled) return;
-      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
-      setPeaksB(computeWaveformPeaks(audioBuffer, numSamples));
-    }).catch(() => {});
-    return () => { cancelled = true; ctx.close(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pixelsPerSecond]);
-
-  // Draw waveforms
-  useEffect(() => {
-    if (canvasRefA.current && peaksA) {
-      canvasRefA.current.width = timelineWidth;
-      canvasRefA.current.style.width = `${timelineWidth}px`;
-      drawWaveform(canvasRefA.current, peaksA, 'rgba(50,180,255,0.7)');
+    if (canvasRef.current && peaks) {
+      canvasRef.current.width = timelineWidth;
+      canvasRef.current.style.width = `${timelineWidth}px`;
+      drawWaveform(canvasRef.current, peaks, 'rgba(50,180,255,0.7)');
     }
-  }, [peaksA, timelineWidth]);
-
-  useEffect(() => {
-    if (canvasRefB.current && peaksB) {
-      canvasRefB.current.width = timelineWidth;
-      canvasRefB.current.style.width = `${timelineWidth}px`;
-      drawWaveform(canvasRefB.current, peaksB, 'rgba(80,220,120,0.7)');
-    }
-  }, [peaksB, timelineWidth]);
+  }, [peaks, timelineWidth]);
 
   // Audio events from track A (primary time source)
   useEffect(() => {
@@ -213,13 +176,13 @@ export function CutEditor() {
     if (!isPlaying) return;
     const container = scrollContainerRef.current;
     if (!container) return;
-    const headX = currentTime * pixelsPerSecond + TRACK_LABEL_WIDTH;
+    const headX = currentTime * PPS + TRACK_LABEL_WIDTH;
     const { scrollLeft, clientWidth } = container;
     const margin = clientWidth * 0.2;
     if (headX < scrollLeft + margin || headX > scrollLeft + clientWidth - margin) {
       container.scrollLeft = headX - clientWidth / 2;
     }
-  }, [currentTime, isPlaying, pixelsPerSecond]);
+  }, [currentTime, isPlaying]);
 
   const seekTo = useCallback((time: number) => {
     const clamped = Math.max(0, Math.min(time, duration));
@@ -268,7 +231,7 @@ export function CutEditor() {
     if (!container || !duration) return;
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left + container.scrollLeft - TRACK_LABEL_WIDTH;
-    const time = x / pixelsPerSecond;
+    const time = x / PPS;
     seekTo(time);
   };
 
@@ -292,22 +255,16 @@ export function CutEditor() {
 
   const handleCancelMark = () => setMarkIn(null);
 
-  // Ruler tick marks
+  // Ruler tick marks (fixed 10s interval)
   const rulerTicks = useMemo(() => {
     if (!duration) return [];
-    // Choose interval based on zoom
-    let interval = 1;
-    if (pixelsPerSecond < 10) interval = 30;
-    else if (pixelsPerSecond < 20) interval = 10;
-    else if (pixelsPerSecond < 50) interval = 5;
-    else if (pixelsPerSecond < 100) interval = 2;
-
-    const ticks: { time: number; x: number; major: boolean }[] = [];
+    const interval = 10;
+    const ticks: { time: number; x: number }[] = [];
     for (let t = 0; t <= duration; t += interval) {
-      ticks.push({ time: t, x: t * pixelsPerSecond, major: true });
+      ticks.push({ time: t, x: t * PPS });
     }
     return ticks;
-  }, [duration, pixelsPerSecond]);
+  }, [duration]);
 
   if (!fileA || !fileB) {
     return (
@@ -326,7 +283,7 @@ export function CutEditor() {
     );
   }
 
-  const playheadX = currentTime * pixelsPerSecond;
+  const playheadX = currentTime * PPS;
 
   return (
     <div className="p-6 flex flex-col gap-4">
@@ -419,22 +376,6 @@ export function CutEditor() {
             }}
           />
           <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>/ {formatTime(duration)}</span>
-
-          {/* Zoom */}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)' }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/>
-            </svg>
-            <input
-              type="range"
-              min={MIN_PPS}
-              max={MAX_PPS}
-              value={pixelsPerSecond}
-              onChange={e => setPixelsPerSecond(Number(e.target.value))}
-              style={{ width: 80, accentColor: 'var(--tg-accent)' }}
-            />
-            <span style={{ fontSize: 10, color: 'var(--tg-t3)', minWidth: 36 }}>{pixelsPerSecond}px/s</span>
-          </div>
         </div>
 
         {/* Mark controls */}
@@ -503,24 +444,22 @@ export function CutEditor() {
                 <div key={tick.time} style={{ position: 'absolute', left: tick.x, top: 0, bottom: 0 }}>
                   <div style={{
                     position: 'absolute', left: 0, bottom: 0,
-                    width: 1, height: tick.major ? 10 : 5,
+                    width: 1, height: 10,
                     background: 'rgba(255,255,255,0.2)',
                   }} />
-                  {tick.major && (
-                    <span style={{
-                      position: 'absolute', left: 3, top: 2,
-                      fontSize: 9, color: 'var(--tg-t3)',
-                      fontFamily: 'var(--font-mono, monospace)',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {formatTime(tick.time)}
-                    </span>
-                  )}
+                  <span style={{
+                    position: 'absolute', left: 3, top: 2,
+                    fontSize: 9, color: 'var(--tg-t3)',
+                    fontFamily: 'var(--font-mono, monospace)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {formatTime(tick.time)}
+                  </span>
                 </div>
               ))}
             </div>
 
-            {/* Track A */}
+            {/* Single merged track */}
             <div style={{
               display: 'flex', height: TRACK_HEIGHT,
               borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -533,25 +472,22 @@ export function CutEditor() {
                 borderRight: '1px solid rgba(255,255,255,0.06)',
                 flexDirection: 'column', gap: 2,
               }}>
-                <span>Track A</span>
-                <span style={{ fontSize: 8, color: 'var(--tg-t3)', maxWidth: 54, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {fileA?.name}
-                </span>
+                <span>Mix</span>
               </div>
               <div style={{ position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer' }}>
                 <canvas
-                  ref={canvasRefA}
+                  ref={canvasRef}
                   style={{ width: timelineWidth, height: TRACK_HEIGHT, display: 'block' }}
                   height={TRACK_HEIGHT}
                 />
-                {/* Cut region overlays for Track A */}
+                {/* Cut region overlays */}
                 {duration > 0 && config.cut_regions.map(region => (
                   <div
-                    key={`a-${region.id}`}
+                    key={region.id}
                     style={{
                       position: 'absolute',
-                      left: region.startTime * pixelsPerSecond,
-                      width: (region.endTime - region.startTime) * pixelsPerSecond,
+                      left: region.startTime * PPS,
+                      width: (region.endTime - region.startTime) * PPS,
                       top: 0, bottom: 0,
                       background: 'rgba(255,59,48,0.25)',
                       borderLeft: '1px solid rgba(255,59,48,0.6)',
@@ -560,12 +496,12 @@ export function CutEditor() {
                     }}
                   />
                 ))}
-                {/* Mark-in overlay for Track A */}
+                {/* Mark-in overlay */}
                 {markIn !== null && duration > 0 && (
                   <div style={{
                     position: 'absolute',
-                    left: Math.min(markIn, currentTime) * pixelsPerSecond,
-                    width: Math.abs(currentTime - markIn) * pixelsPerSecond,
+                    left: Math.min(markIn, currentTime) * PPS,
+                    width: Math.abs(currentTime - markIn) * PPS,
                     top: 0, bottom: 0,
                     background: 'rgba(255,159,10,0.2)',
                     borderLeft: '2px solid rgba(255,159,10,0.8)',
@@ -575,62 +511,7 @@ export function CutEditor() {
               </div>
             </div>
 
-            {/* Track B */}
-            <div style={{
-              display: 'flex', height: TRACK_HEIGHT,
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <div style={{
-                width: TRACK_LABEL_WIDTH, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 600, color: 'rgba(80,220,120,0.8)',
-                background: 'rgba(80,220,120,0.05)',
-                borderRight: '1px solid rgba(255,255,255,0.06)',
-                flexDirection: 'column', gap: 2,
-              }}>
-                <span>Track B</span>
-                <span style={{ fontSize: 8, color: 'var(--tg-t3)', maxWidth: 54, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {fileB?.name}
-                </span>
-              </div>
-              <div style={{ position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer' }}>
-                <canvas
-                  ref={canvasRefB}
-                  style={{ width: timelineWidth, height: TRACK_HEIGHT, display: 'block' }}
-                  height={TRACK_HEIGHT}
-                />
-                {/* Cut region overlays for Track B */}
-                {duration > 0 && config.cut_regions.map(region => (
-                  <div
-                    key={`b-${region.id}`}
-                    style={{
-                      position: 'absolute',
-                      left: region.startTime * pixelsPerSecond,
-                      width: (region.endTime - region.startTime) * pixelsPerSecond,
-                      top: 0, bottom: 0,
-                      background: 'rgba(255,59,48,0.25)',
-                      borderLeft: '1px solid rgba(255,59,48,0.6)',
-                      borderRight: '1px solid rgba(255,59,48,0.6)',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                ))}
-                {/* Mark-in overlay for Track B */}
-                {markIn !== null && duration > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    left: Math.min(markIn, currentTime) * pixelsPerSecond,
-                    width: Math.abs(currentTime - markIn) * pixelsPerSecond,
-                    top: 0, bottom: 0,
-                    background: 'rgba(255,159,10,0.2)',
-                    borderLeft: '2px solid rgba(255,159,10,0.8)',
-                    pointerEvents: 'none',
-                  }} />
-                )}
-              </div>
-            </div>
-
-            {/* Playhead line (spans ruler + both tracks) */}
+            {/* Playhead line (spans ruler + track) */}
             {duration > 0 && (
               <div style={{
                 position: 'absolute',
@@ -740,7 +621,7 @@ export function CutEditor() {
         <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>
         </svg>
-        <span>カット区間は両トラック（A・B）に同時に適用されます。時間座標はアップロードした生ファイル基準です。</span>
+        <span>カット区間は両トラック（A・B）に同時に適用されます。同期トリム後の時間に自動補正されます。</span>
       </div>
     </div>
   );
