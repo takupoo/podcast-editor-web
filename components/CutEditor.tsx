@@ -68,6 +68,7 @@ export function CutEditor() {
   const [audioUrlB, setAudioUrlB] = useState<string | null>(null);
   const [markIn, setMarkIn] = useState<number | null>(null);
   const [timeInput, setTimeInput] = useState('0:00');
+  const [syncing, setSyncing] = useState(false);
   // クラップ同期オフセット（各トラックの開始位置）
   const syncOffsetA = useRef(0);
   const syncOffsetB = useRef(0);
@@ -97,8 +98,9 @@ export function CutEditor() {
 
   // Clap detection → sync offsets + duration
   useEffect(() => {
-    if (!fileA || !fileB) { setDuration(0); return; }
+    if (!fileA || !fileB) { setDuration(0); setSyncing(false); return; }
     let cancelled = false;
+    setSyncing(true);
     (async () => {
       try {
         const ctx = new AudioContext();
@@ -128,9 +130,12 @@ export function CutEditor() {
 
         if (!cancelled) {
           setDuration(syncDur);
+          setSyncing(false);
         }
         ctx.close();
-      } catch { /* ignore */ }
+      } catch {
+        if (!cancelled) setSyncing(false);
+      }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,8 +333,25 @@ export function CutEditor() {
       {audioUrlA && <audio ref={audioRefA} src={audioUrlA} preload="metadata" />}
       {audioUrlB && <audio ref={audioRefB} src={audioUrlB} preload="metadata" />}
 
+      {/* Sync status */}
+      {syncing && (
+        <div className="tg-grp" style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '16px 20px',
+        }}>
+          <svg className="animate-spin" style={{ width: 16, height: 16, color: 'var(--tg-accent)' }} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" />
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>音声を同期中...</div>
+            <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>クラップ音を検出して2トラックを同期しています</div>
+          </div>
+        </div>
+      )}
+
       {/* Timeline group */}
-      <div className="tg-grp">
+      <div className="tg-grp" style={{ opacity: syncing ? 0.4 : 1, pointerEvents: syncing ? 'none' : undefined, transition: 'opacity 0.2s' }}>
         <div style={{
           padding: '9px 16px 5px',
           fontSize: 11, fontWeight: 600,
