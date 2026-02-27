@@ -4,7 +4,7 @@ import { ProcessProgress } from '@/lib/pipeline/types';
 
 const stageNames: Record<string, string> = {
   loading:   'ロード中',
-  trim:      'トリム',
+  trim:      '同期',
   denoise:   'ノイズ除去',
   loudness:  'ラウドネス正規化',
   dynamics:  'ダイナミクス処理',

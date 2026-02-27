@@ -133,7 +133,7 @@ function TrimSection() {
             <path d="M6 9 L2 13"/><path d="M6 9 L10 13"/><path d="M18 9 L14 13"/><path d="M18 9 L22 13"/>
           </svg>
         }
-        title="トリム"
+        title="同期"
         desc="クラップ音検出による前後カット"
       />
       <div className="tg-grp" style={{ background: 'linear-gradient(145deg,rgba(255,159,10,0.06),transparent)' }}>
@@ -194,7 +194,7 @@ function ProcessingSection() {
           </svg>
         }
         title="ノイズ除去 / ラウドネス / ダイナミクス"
-        desc="音声処理パイプライン（Stage 2–4）"
+        desc="音声加工パイプライン（Stage 2–4）"
         enabledKey="denoise_enabled"
       />
 

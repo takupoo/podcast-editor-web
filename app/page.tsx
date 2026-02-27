@@ -42,9 +42,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: '編集',
     items: [
-      { id: 'trim',       label: 'トリム',            dot: () => 'on' },
+      { id: 'trim',       label: '同期',              dot: () => 'on' },
       { id: 'cut',        label: '手動カット',         dot: (c) => c.cut_regions.length > 0 ? 'on' : null },
-      { id: 'processing', label: '音声処理',           dot: (c) => c.denoise_enabled ? 'on' : 'off' },
+      { id: 'processing', label: '音声加工',           dot: (c) => c.denoise_enabled ? 'on' : 'off' },
       { id: 'silence',    label: '無音カット',         dot: (c) => c.silence_trim_enabled ? 'on' : 'off' },
       { id: 'mix',        label: 'BGM / エンディング', dot: (c) => (c.bgm_filename || c.endscene_filename) ? 'on' : 'off' },
     ],
