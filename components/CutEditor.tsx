@@ -48,65 +48,8 @@ function detectClap(audioBuffer: AudioBuffer, thresholdDb: number = -10.0): numb
   return 0; // クラップ未検出時は先頭から
 }
 
-function computeWaveformPeaks(
-  audioBuffer: AudioBuffer,
-  numSamples: number,
-  offsetSeconds: number = 0,
-): Float32Array {
-  const channelData = audioBuffer.getChannelData(0);
-  const sampleRate = audioBuffer.sampleRate;
-  const startSample = Math.floor(offsetSeconds * sampleRate);
-  const totalSamples = channelData.length - startSample;
-  const blockSize = Math.floor(totalSamples / numSamples);
-  const peaks = new Float32Array(numSamples);
-  for (let i = 0; i < numSamples; i++) {
-    let max = 0;
-    const start = startSample + i * blockSize;
-    const end = Math.min(start + blockSize, channelData.length);
-    for (let j = start; j < end; j++) {
-      const abs = Math.abs(channelData[j]);
-      if (abs > max) max = abs;
-    }
-    peaks[i] = max;
-  }
-  return peaks;
-}
-
-function drawWaveform(
-  canvas: HTMLCanvasElement,
-  peaks: Float32Array,
-  color: string,
-) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const { width, height } = canvas;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, width, height);
-
-  const mid = height / 2;
-  ctx.fillStyle = color;
-  const barWidth = width / peaks.length;
-  for (let i = 0; i < peaks.length; i++) {
-    const h = peaks[i] * mid * 0.9;
-    ctx.fillRect(i * barWidth, mid - h, Math.max(barWidth - 0.5, 0.5), h * 2);
-  }
-}
-
-/** 2つのピーク配列を合成（各サンプルの最大値） */
-function mergePeaks(a: Float32Array, b: Float32Array): Float32Array {
-  const len = Math.min(a.length, b.length);
-  const merged = new Float32Array(len);
-  for (let i = 0; i < len; i++) {
-    merged[i] = Math.max(a[i], b[i]);
-  }
-  return merged;
-}
-
 const RULER_HEIGHT = 24;
-const TRACK_HEIGHT = 100;
+const TRACK_HEIGHT = 60;
 const TRACK_LABEL_WIDTH = 60;
 const PPS = 20;
 
@@ -115,7 +58,6 @@ export function CutEditor() {
 
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
 
@@ -126,7 +68,6 @@ export function CutEditor() {
   const [audioUrlB, setAudioUrlB] = useState<string | null>(null);
   const [markIn, setMarkIn] = useState<number | null>(null);
   const [timeInput, setTimeInput] = useState('0:00');
-  const [peaks, setPeaks] = useState<Float32Array | null>(null);
   // クラップ同期オフセット（各トラックの開始位置）
   const syncOffsetA = useRef(0);
   const syncOffsetB = useRef(0);
@@ -154,9 +95,9 @@ export function CutEditor() {
     return () => URL.revokeObjectURL(url);
   }, [fileB]);
 
-  // Decode waveform + clap detection → synced merged peaks
+  // Clap detection → sync offsets + duration
   useEffect(() => {
-    if (!fileA || !fileB) { setPeaks(null); setDuration(0); return; }
+    if (!fileA || !fileB) { setDuration(0); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -184,14 +125,8 @@ export function CutEditor() {
 
         // 同期後の長さ（短い方に合わせる）
         const syncDur = Math.min(bufA.duration - offA, bufB.duration - offB);
-        const numSamples = Math.max(Math.floor(syncDur * PPS), 100);
-
-        // 同期位置からの波形ピークを計算・合成
-        const pA = computeWaveformPeaks(bufA, numSamples, offA);
-        const pB = computeWaveformPeaks(bufB, numSamples, offB);
 
         if (!cancelled) {
-          setPeaks(mergePeaks(pA, pB));
           setDuration(syncDur);
         }
         ctx.close();
@@ -200,15 +135,6 @@ export function CutEditor() {
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileA, fileB]);
-
-  // Draw waveform
-  useEffect(() => {
-    if (canvasRef.current && peaks) {
-      canvasRef.current.width = timelineWidth;
-      canvasRef.current.style.width = `${timelineWidth}px`;
-      drawWaveform(canvasRef.current, peaks, 'rgba(50,180,255,0.7)');
-    }
-  }, [peaks, timelineWidth]);
 
   // Audio events from track A
   useEffect(() => {
@@ -555,12 +481,10 @@ export function CutEditor() {
               }}>
                 <span>Mix</span>
               </div>
-              <div style={{ position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer' }}>
-                <canvas
-                  ref={canvasRef}
-                  style={{ width: timelineWidth, height: TRACK_HEIGHT, display: 'block' }}
-                  height={TRACK_HEIGHT}
-                />
+              <div style={{
+                position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer',
+                background: 'rgba(50,180,255,0.06)',
+              }}>
                 {/* Cut region overlays */}
                 {duration > 0 && config.cut_regions.map(region => (
                   <div
