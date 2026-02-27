@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 
 function formatTime(seconds: number): string {
@@ -9,106 +9,305 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function parseTime(str: string): number | null {
+  const match = str.match(/^(\d+):(\d{1,2})$/);
+  if (!match) return null;
+  return parseInt(match[1]) * 60 + parseInt(match[2]);
+}
+
+function computeWaveformPeaks(audioBuffer: AudioBuffer, numSamples: number): Float32Array {
+  const channelData = audioBuffer.getChannelData(0);
+  const blockSize = Math.floor(channelData.length / numSamples);
+  const peaks = new Float32Array(numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    let max = 0;
+    const start = i * blockSize;
+    const end = Math.min(start + blockSize, channelData.length);
+    for (let j = start; j < end; j++) {
+      const abs = Math.abs(channelData[j]);
+      if (abs > max) max = abs;
+    }
+    peaks[i] = max;
+  }
+  return peaks;
+}
+
+function drawWaveform(
+  canvas: HTMLCanvasElement,
+  peaks: Float32Array,
+  color: string,
+) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { width, height } = canvas;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const mid = height / 2;
+  ctx.fillStyle = color;
+  const barWidth = width / peaks.length;
+  for (let i = 0; i < peaks.length; i++) {
+    const h = peaks[i] * mid * 0.9;
+    ctx.fillRect(i * barWidth, mid - h, Math.max(barWidth - 0.5, 0.5), h * 2);
+  }
+}
+
+const RULER_HEIGHT = 24;
+const TRACK_HEIGHT = 80;
+const TRACK_LABEL_WIDTH = 60;
+const MIN_PPS = 5;
+const MAX_PPS = 200;
+const DEFAULT_PPS = 20;
+
 export function CutEditor() {
   const { files, config, addCutRegion, removeCutRegion, clearCutRegions } = useAppStore();
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
 
-  const [activeTrack, setActiveTrack] = useState<'A' | 'B'>('A');
+  const audioRefA = useRef<HTMLAudioElement>(null);
+  const audioRefB = useRef<HTMLAudioElement>(null);
+  const canvasRefA = useRef<HTMLCanvasElement>(null);
+  const canvasRefB = useRef<HTMLCanvasElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioUrlA, setAudioUrlA] = useState<string | null>(null);
+  const [audioUrlB, setAudioUrlB] = useState<string | null>(null);
   const [markIn, setMarkIn] = useState<number | null>(null);
+  const [pixelsPerSecond, setPixelsPerSecond] = useState(DEFAULT_PPS);
+  const [timeInput, setTimeInput] = useState('0:00');
+  const [peaksA, setPeaksA] = useState<Float32Array | null>(null);
+  const [peaksB, setPeaksB] = useState<Float32Array | null>(null);
 
   const fileA = files[0] ?? null;
   const fileB = files[1] ?? null;
-  const activeFile = activeTrack === 'A' ? fileA : fileB;
 
-  // オーディオURLの管理
+  const timelineWidth = useMemo(
+    () => Math.max(duration * pixelsPerSecond, 1),
+    [duration, pixelsPerSecond],
+  );
+
+  // Audio URL management
   useEffect(() => {
-    if (!activeFile) {
-      setAudioUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(activeFile);
-    setAudioUrl(url);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
+    if (!fileA) { setAudioUrlA(null); return; }
+    const url = URL.createObjectURL(fileA);
+    setAudioUrlA(url);
     return () => URL.revokeObjectURL(url);
-  }, [activeFile]);
+  }, [fileA]);
 
-  // 再生時刻の更新
   useEffect(() => {
-    const audio = audioRef.current;
+    if (!fileB) { setAudioUrlB(null); return; }
+    const url = URL.createObjectURL(fileB);
+    setAudioUrlB(url);
+    return () => URL.revokeObjectURL(url);
+  }, [fileB]);
+
+  // Decode waveform data
+  useEffect(() => {
+    if (!fileA) { setPeaksA(null); return; }
+    let cancelled = false;
+    const ctx = new AudioContext();
+    fileA.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
+      if (cancelled) return;
+      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
+      setPeaksA(computeWaveformPeaks(audioBuffer, numSamples));
+    }).catch(() => {});
+    return () => { cancelled = true; ctx.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileA]);
+
+  useEffect(() => {
+    if (!fileB) { setPeaksB(null); return; }
+    let cancelled = false;
+    const ctx = new AudioContext();
+    fileB.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
+      if (cancelled) return;
+      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
+      setPeaksB(computeWaveformPeaks(audioBuffer, numSamples));
+    }).catch(() => {});
+    return () => { cancelled = true; ctx.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileB]);
+
+  // Recompute peaks when zoom changes (reuse decoded data is complex, so we just resample)
+  useEffect(() => {
+    if (!peaksA || !duration) return;
+    // Re-decode for new zoom level
+    if (!fileA) return;
+    let cancelled = false;
+    const ctx = new AudioContext();
+    fileA.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
+      if (cancelled) return;
+      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
+      setPeaksA(computeWaveformPeaks(audioBuffer, numSamples));
+    }).catch(() => {});
+    return () => { cancelled = true; ctx.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixelsPerSecond]);
+
+  useEffect(() => {
+    if (!peaksB || !duration) return;
+    if (!fileB) return;
+    let cancelled = false;
+    const ctx = new AudioContext();
+    fileB.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuffer => {
+      if (cancelled) return;
+      const numSamples = Math.max(Math.floor(audioBuffer.duration * pixelsPerSecond), 100);
+      setPeaksB(computeWaveformPeaks(audioBuffer, numSamples));
+    }).catch(() => {});
+    return () => { cancelled = true; ctx.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixelsPerSecond]);
+
+  // Draw waveforms
+  useEffect(() => {
+    if (canvasRefA.current && peaksA) {
+      canvasRefA.current.width = timelineWidth;
+      canvasRefA.current.style.width = `${timelineWidth}px`;
+      drawWaveform(canvasRefA.current, peaksA, 'rgba(50,180,255,0.7)');
+    }
+  }, [peaksA, timelineWidth]);
+
+  useEffect(() => {
+    if (canvasRefB.current && peaksB) {
+      canvasRefB.current.width = timelineWidth;
+      canvasRefB.current.style.width = `${timelineWidth}px`;
+      drawWaveform(canvasRefB.current, peaksB, 'rgba(80,220,120,0.7)');
+    }
+  }, [peaksB, timelineWidth]);
+
+  // Audio events from track A (primary time source)
+  useEffect(() => {
+    const audio = audioRefA.current;
     if (!audio) return;
-
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onLoadedMetadata = () => setDuration(audio.duration);
+    const onLoaded = () => setDuration(audio.duration);
     const onEnded = () => setIsPlaying(false);
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('loadedmetadata', onLoaded);
     audio.addEventListener('ended', onEnded);
-
     return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('loadedmetadata', onLoaded);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [audioUrl]);
+  }, [audioUrlA]);
+
+  // rAF-based time update for smooth playhead
+  useEffect(() => {
+    const tick = () => {
+      const audio = audioRefA.current;
+      if (audio && !audio.paused) {
+        setCurrentTime(audio.currentTime);
+        setTimeInput(formatTime(audio.currentTime));
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  // Auto-scroll to keep playhead visible
+  useEffect(() => {
+    if (!isPlaying) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const headX = currentTime * pixelsPerSecond + TRACK_LABEL_WIDTH;
+    const { scrollLeft, clientWidth } = container;
+    const margin = clientWidth * 0.2;
+    if (headX < scrollLeft + margin || headX > scrollLeft + clientWidth - margin) {
+      container.scrollLeft = headX - clientWidth / 2;
+    }
+  }, [currentTime, isPlaying, pixelsPerSecond]);
+
+  const seekTo = useCallback((time: number) => {
+    const clamped = Math.max(0, Math.min(time, duration));
+    if (audioRefA.current) audioRefA.current.currentTime = clamped;
+    if (audioRefB.current) audioRefB.current.currentTime = clamped;
+    setCurrentTime(clamped);
+    setTimeInput(formatTime(clamped));
+  }, [duration]);
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const a = audioRefA.current;
+    const b = audioRefB.current;
+    if (!a) return;
     if (isPlaying) {
-      audio.pause();
+      a.pause();
+      b?.pause();
       setIsPlaying(false);
     } else {
-      audio.play();
+      // Sync B to A before play
+      if (b) b.currentTime = a.currentTime;
+      a.play();
+      b?.play();
       setIsPlaying(true);
     }
   }, [isPlaying]);
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const audio = audioRef.current;
-    const bar = progressRef.current;
-    if (!audio || !bar || !duration) return;
-    const rect = bar.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    audio.currentTime = ratio * duration;
-    setCurrentTime(audio.currentTime);
+  const skip = useCallback((delta: number) => {
+    seekTo(currentTime + delta);
+  }, [currentTime, seekTo]);
+
+  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const t = parseTime(timeInput);
+      if (t !== null) seekTo(t);
+    }
   };
 
-  const handleMarkIn = () => {
-    setMarkIn(currentTime);
+  const handleTimeInputBlur = () => {
+    const t = parseTime(timeInput);
+    if (t !== null) seekTo(t);
+    else setTimeInput(formatTime(currentTime));
   };
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const container = scrollContainerRef.current;
+    if (!container || !duration) return;
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left + container.scrollLeft - TRACK_LABEL_WIDTH;
+    const time = x / pixelsPerSecond;
+    seekTo(time);
+  };
+
+  const handleMarkIn = () => setMarkIn(currentTime);
 
   const handleMarkOut = () => {
     if (markIn === null) return;
     const start = Math.min(markIn, currentTime);
     const end = Math.max(markIn, currentTime);
-    if (end - start < 0.1) return; // 最低0.1秒
-
-    // 重複チェック
+    if (end - start < 0.1) return;
     const overlapping = config.cut_regions.some(
-      r => start < r.endTime && end > r.startTime
+      r => start < r.endTime && end > r.startTime,
     );
     if (overlapping) {
       alert('既存のカット区間と重複しています');
       return;
     }
-
     addCutRegion({ startTime: start, endTime: end });
     setMarkIn(null);
   };
 
-  const handleCancelMark = () => {
-    setMarkIn(null);
-  };
+  const handleCancelMark = () => setMarkIn(null);
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  // Ruler tick marks
+  const rulerTicks = useMemo(() => {
+    if (!duration) return [];
+    // Choose interval based on zoom
+    let interval = 1;
+    if (pixelsPerSecond < 10) interval = 30;
+    else if (pixelsPerSecond < 20) interval = 10;
+    else if (pixelsPerSecond < 50) interval = 5;
+    else if (pixelsPerSecond < 100) interval = 2;
+
+    const ticks: { time: number; x: number; major: boolean }[] = [];
+    for (let t = 0; t <= duration; t += interval) {
+      ticks.push({ time: t, x: t * pixelsPerSecond, major: true });
+    }
+    return ticks;
+  }, [duration, pixelsPerSecond]);
 
   if (!fileA || !fileB) {
     return (
@@ -126,6 +325,8 @@ export function CutEditor() {
       </div>
     );
   }
+
+  const playheadX = currentTime * pixelsPerSecond;
 
   return (
     <div className="p-6 flex flex-col gap-4">
@@ -159,7 +360,11 @@ export function CutEditor() {
         )}
       </div>
 
-      {/* Track switch */}
+      {/* Hidden audio elements */}
+      {audioUrlA && <audio ref={audioRefA} src={audioUrlA} preload="metadata" />}
+      {audioUrlB && <audio ref={audioRefB} src={audioUrlB} preload="metadata" />}
+
+      {/* Timeline group */}
       <div className="tg-grp">
         <div style={{
           padding: '9px 16px 5px',
@@ -169,183 +374,284 @@ export function CutEditor() {
           textTransform: 'uppercase',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-          プレーヤー
+          タイムライン
         </div>
-        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Track selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--tg-t2)', minWidth: 50 }}>トラック</span>
-            <div className="tg-seg">
-              <button
-                className={`tg-seg-btn${activeTrack === 'A' ? ' active' : ''}`}
-                onClick={() => setActiveTrack('A')}
-              >
-                Track A
-              </button>
-              <button
-                className={`tg-seg-btn${activeTrack === 'B' ? ' active' : ''}`}
-                onClick={() => setActiveTrack('B')}
-              >
-                Track B
-              </button>
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--tg-t3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activeFile?.name}
-            </span>
+
+        {/* Toolbar */}
+        <div style={{
+          padding: '8px 16px',
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          {/* Play/Pause */}
+          <button className="tg-btn" onClick={togglePlay} disabled={!audioUrlA} style={{ minWidth: 40, padding: '4px 8px' }}>
+            {isPlaying ? (
+              <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="currentColor">
+                <rect x="3" y="2" width="4" height="12" rx="1"/>
+                <rect x="9" y="2" width="4" height="12" rx="1"/>
+              </svg>
+            ) : (
+              <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6 3.5l7 4.5-7 4.5V3.5z"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Skip buttons */}
+          <button className="tg-btn" onClick={() => skip(-10)} style={{ fontSize: 10, padding: '4px 6px' }}>-10s</button>
+          <button className="tg-btn" onClick={() => skip(-5)} style={{ fontSize: 10, padding: '4px 6px' }}>-5s</button>
+          <button className="tg-btn" onClick={() => skip(5)} style={{ fontSize: 10, padding: '4px 6px' }}>+5s</button>
+          <button className="tg-btn" onClick={() => skip(10)} style={{ fontSize: 10, padding: '4px 6px' }}>+10s</button>
+
+          {/* Time input */}
+          <input
+            value={timeInput}
+            onChange={e => setTimeInput(e.target.value)}
+            onKeyDown={handleTimeInputKeyDown}
+            onBlur={handleTimeInputBlur}
+            style={{
+              width: 56, padding: '3px 6px',
+              fontSize: 11, fontFamily: 'var(--font-mono, monospace)',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 5, color: 'var(--tg-t1)',
+              textAlign: 'center',
+            }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>/ {formatTime(duration)}</span>
+
+          {/* Zoom */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)' }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/>
+            </svg>
+            <input
+              type="range"
+              min={MIN_PPS}
+              max={MAX_PPS}
+              value={pixelsPerSecond}
+              onChange={e => setPixelsPerSecond(Number(e.target.value))}
+              style={{ width: 80, accentColor: 'var(--tg-accent)' }}
+            />
+            <span style={{ fontSize: 10, color: 'var(--tg-t3)', minWidth: 36 }}>{pixelsPerSecond}px/s</span>
           </div>
+        </div>
 
-          {/* Audio element */}
-          {audioUrl && <audio ref={audioRef} src={audioUrl} preload="metadata" />}
+        {/* Mark controls */}
+        <div style={{
+          padding: '6px 16px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          {markIn === null ? (
+            <button
+              className="tg-btn"
+              onClick={handleMarkIn}
+              disabled={!audioUrlA || !duration}
+              style={{ background: 'rgba(255,159,10,0.12)', borderColor: 'rgba(255,159,10,0.25)', fontSize: 11, padding: '3px 10px' }}
+            >
+              ここから
+            </button>
+          ) : (
+            <>
+              <button
+                className="tg-btn"
+                onClick={handleMarkOut}
+                style={{ background: 'rgba(255,59,48,0.12)', borderColor: 'rgba(255,59,48,0.25)', fontSize: 11, padding: '3px 10px' }}
+              >
+                ここまで
+              </button>
+              <button className="tg-btn" onClick={handleCancelMark} style={{ fontSize: 11, padding: '3px 10px' }}>
+                キャンセル
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--tg-orange)' }}>
+                開始: {formatTime(markIn)}
+              </span>
+            </>
+          )}
+        </div>
 
-          {/* Progress bar */}
+        {/* Scrollable timeline area */}
+        <div
+          ref={scrollContainerRef}
+          style={{
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            position: 'relative',
+            background: 'rgba(0,0,0,0.2)',
+          }}
+        >
+          {/* Timeline content */}
           <div
-            ref={progressRef}
-            onClick={handleProgressClick}
             style={{
               position: 'relative',
-              height: 32,
-              background: 'rgba(255,255,255,0.06)',
-              borderRadius: 6,
-              cursor: 'pointer',
-              overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.09)',
+              width: timelineWidth + TRACK_LABEL_WIDTH,
+              minWidth: '100%',
             }}
+            onClick={handleTimelineClick}
           >
-            {/* Cut region overlays */}
-            {duration > 0 && config.cut_regions.map(region => {
-              const left = (region.startTime / duration) * 100;
-              const width = ((region.endTime - region.startTime) / duration) * 100;
-              return (
-                <div
-                  key={region.id}
-                  style={{
-                    position: 'absolute',
-                    left: `${left}%`,
-                    width: `${width}%`,
-                    top: 0,
-                    bottom: 0,
-                    background: 'rgba(255,59,48,0.3)',
-                    borderLeft: '1px solid rgba(255,59,48,0.6)',
-                    borderRight: '1px solid rgba(255,59,48,0.6)',
-                    zIndex: 1,
-                  }}
+            {/* Ruler */}
+            <div style={{
+              height: RULER_HEIGHT,
+              position: 'relative',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              marginLeft: TRACK_LABEL_WIDTH,
+              width: timelineWidth,
+              cursor: 'pointer',
+            }}>
+              {rulerTicks.map(tick => (
+                <div key={tick.time} style={{ position: 'absolute', left: tick.x, top: 0, bottom: 0 }}>
+                  <div style={{
+                    position: 'absolute', left: 0, bottom: 0,
+                    width: 1, height: tick.major ? 10 : 5,
+                    background: 'rgba(255,255,255,0.2)',
+                  }} />
+                  {tick.major && (
+                    <span style={{
+                      position: 'absolute', left: 3, top: 2,
+                      fontSize: 9, color: 'var(--tg-t3)',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {formatTime(tick.time)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Track A */}
+            <div style={{
+              display: 'flex', height: TRACK_HEIGHT,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                width: TRACK_LABEL_WIDTH, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 600, color: 'rgba(50,180,255,0.8)',
+                background: 'rgba(50,180,255,0.05)',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                flexDirection: 'column', gap: 2,
+              }}>
+                <span>Track A</span>
+                <span style={{ fontSize: 8, color: 'var(--tg-t3)', maxWidth: 54, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fileA?.name}
+                </span>
+              </div>
+              <div style={{ position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer' }}>
+                <canvas
+                  ref={canvasRefA}
+                  style={{ width: timelineWidth, height: TRACK_HEIGHT, display: 'block' }}
+                  height={TRACK_HEIGHT}
                 />
-              );
-            })}
+                {/* Cut region overlays for Track A */}
+                {duration > 0 && config.cut_regions.map(region => (
+                  <div
+                    key={`a-${region.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: region.startTime * pixelsPerSecond,
+                      width: (region.endTime - region.startTime) * pixelsPerSecond,
+                      top: 0, bottom: 0,
+                      background: 'rgba(255,59,48,0.25)',
+                      borderLeft: '1px solid rgba(255,59,48,0.6)',
+                      borderRight: '1px solid rgba(255,59,48,0.6)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                ))}
+                {/* Mark-in overlay for Track A */}
+                {markIn !== null && duration > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: Math.min(markIn, currentTime) * pixelsPerSecond,
+                    width: Math.abs(currentTime - markIn) * pixelsPerSecond,
+                    top: 0, bottom: 0,
+                    background: 'rgba(255,159,10,0.2)',
+                    borderLeft: '2px solid rgba(255,159,10,0.8)',
+                    pointerEvents: 'none',
+                  }} />
+                )}
+              </div>
+            </div>
 
-            {/* Mark-in indicator */}
-            {markIn !== null && duration > 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: `${(markIn / duration) * 100}%`,
-                  width: `${((currentTime - markIn) / duration) * 100}%`,
-                  top: 0,
-                  bottom: 0,
-                  background: 'rgba(255,159,10,0.2)',
-                  borderLeft: '2px solid rgba(255,159,10,0.8)',
-                  zIndex: 1,
-                }}
-              />
-            )}
+            {/* Track B */}
+            <div style={{
+              display: 'flex', height: TRACK_HEIGHT,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                width: TRACK_LABEL_WIDTH, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 600, color: 'rgba(80,220,120,0.8)',
+                background: 'rgba(80,220,120,0.05)',
+                borderRight: '1px solid rgba(255,255,255,0.06)',
+                flexDirection: 'column', gap: 2,
+              }}>
+                <span>Track B</span>
+                <span style={{ fontSize: 8, color: 'var(--tg-t3)', maxWidth: 54, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fileB?.name}
+                </span>
+              </div>
+              <div style={{ position: 'relative', width: timelineWidth, height: TRACK_HEIGHT, cursor: 'pointer' }}>
+                <canvas
+                  ref={canvasRefB}
+                  style={{ width: timelineWidth, height: TRACK_HEIGHT, display: 'block' }}
+                  height={TRACK_HEIGHT}
+                />
+                {/* Cut region overlays for Track B */}
+                {duration > 0 && config.cut_regions.map(region => (
+                  <div
+                    key={`b-${region.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: region.startTime * pixelsPerSecond,
+                      width: (region.endTime - region.startTime) * pixelsPerSecond,
+                      top: 0, bottom: 0,
+                      background: 'rgba(255,59,48,0.25)',
+                      borderLeft: '1px solid rgba(255,59,48,0.6)',
+                      borderRight: '1px solid rgba(255,59,48,0.6)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                ))}
+                {/* Mark-in overlay for Track B */}
+                {markIn !== null && duration > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: Math.min(markIn, currentTime) * pixelsPerSecond,
+                    width: Math.abs(currentTime - markIn) * pixelsPerSecond,
+                    top: 0, bottom: 0,
+                    background: 'rgba(255,159,10,0.2)',
+                    borderLeft: '2px solid rgba(255,159,10,0.8)',
+                    pointerEvents: 'none',
+                  }} />
+                )}
+              </div>
+            </div>
 
-            {/* Progress fill */}
-            <div
-              style={{
+            {/* Playhead line (spans ruler + both tracks) */}
+            {duration > 0 && (
+              <div style={{
                 position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${progress}%`,
-                background: 'rgba(255,255,255,0.1)',
-                zIndex: 0,
-              }}
-            />
-
-            {/* Playhead */}
-            <div
-              style={{
-                position: 'absolute',
-                left: `${progress}%`,
+                left: playheadX + TRACK_LABEL_WIDTH,
                 top: 0,
                 bottom: 0,
                 width: 2,
-                background: 'var(--tg-accent)',
-                zIndex: 2,
-              }}
-            />
-
-            {/* Time display */}
-            <div style={{
-              position: 'absolute',
-              left: 8, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 11, color: 'var(--tg-t1)', fontFamily: 'var(--font-mono, monospace)',
-              zIndex: 3,
-            }}>
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Play/Pause */}
-            <button
-              className="tg-btn"
-              onClick={togglePlay}
-              disabled={!audioUrl}
-              style={{ minWidth: 80 }}
-            >
-              {isPlaying ? (
-                <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor">
-                  <rect x="3" y="2" width="4" height="12" rx="1"/>
-                  <rect x="9" y="2" width="4" height="12" rx="1"/>
-                </svg>
-              ) : (
-                <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M6 3.5l7 4.5-7 4.5V3.5z"/>
-                </svg>
-              )}
-              {isPlaying ? '一時停止' : '再生'}
-            </button>
-
-            <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />
-
-            {/* Mark In/Out */}
-            {markIn === null ? (
-              <button
-                className="tg-btn"
-                onClick={handleMarkIn}
-                disabled={!audioUrl || !duration}
-                style={{ background: 'rgba(255,159,10,0.12)', borderColor: 'rgba(255,159,10,0.25)' }}
-              >
-                <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M4 2v12M4 8h8"/>
-                </svg>
-                ここから
-              </button>
-            ) : (
-              <>
-                <button
-                  className="tg-btn"
-                  onClick={handleMarkOut}
-                  style={{ background: 'rgba(255,59,48,0.12)', borderColor: 'rgba(255,59,48,0.25)' }}
-                >
-                  <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M12 2v12M4 8h8"/>
-                  </svg>
-                  ここまで
-                </button>
-                <button
-                  className="tg-btn"
-                  onClick={handleCancelMark}
-                  style={{ fontSize: 11 }}
-                >
-                  キャンセル
-                </button>
-                <span style={{ fontSize: 11, color: 'var(--tg-orange)' }}>
-                  開始: {formatTime(markIn)}
-                </span>
-              </>
+                background: 'rgba(50,140,255,0.9)',
+                pointerEvents: 'none',
+                zIndex: 10,
+              }}>
+                {/* Playhead triangle */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0, left: -4,
+                  width: 0, height: 0,
+                  borderLeft: '5px solid transparent',
+                  borderRight: '5px solid transparent',
+                  borderTop: '7px solid rgba(50,140,255,0.9)',
+                }} />
+              </div>
             )}
           </div>
         </div>
@@ -404,14 +710,7 @@ export function CutEditor() {
                     ({(region.endTime - region.startTime).toFixed(1)}秒)
                   </span>
                   <button
-                    onClick={() => {
-                      // シークしてカット区間の開始位置に移動
-                      const audio = audioRef.current;
-                      if (audio) {
-                        audio.currentTime = region.startTime;
-                        setCurrentTime(region.startTime);
-                      }
-                    }}
+                    onClick={() => seekTo(region.startTime)}
                     style={{
                       marginLeft: 'auto',
                       fontSize: 11, color: 'var(--tg-accent)', cursor: 'pointer',
