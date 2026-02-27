@@ -20,8 +20,6 @@ const ConfigPanel = dynamic<{ activeSection: ConfigSection }>(
 // ── Section types ─────────────────────────────────────────────
 type SectionId =
   | 'source'
-  | 'overview'
-  | 'preview'
   | 'trim'
   | 'cut'
   | 'processing'
@@ -29,21 +27,34 @@ type SectionId =
   | 'mix'
   | 'export';
 
-interface NavSection {
+interface NavItem {
   id: SectionId;
   label: string;
-  dot?: 'on' | 'off' | 'none';
+  dot: (config: ReturnType<typeof useAppStore.getState>['config']) => 'on' | 'off' | null;
 }
 
-const STAGES: NavSection[] = [
-  { id: 'overview',    label: '概要',              dot: 'none' },
-  { id: 'preview',     label: '🚀 プレビュー',     dot: 'none' },
-  { id: 'trim',        label: '1. トリム',          dot: 'on'   },
-  { id: 'cut',         label: '1.5 手動カット',     dot: 'none' },
-  { id: 'processing',  label: '2–4. 音声処理',     dot: 'on'   },
-  { id: 'silence',     label: '5. 無音カット',      dot: 'off'  },
-  { id: 'mix',         label: '6. BGM・エンドシーン', dot: 'on' },
-  { id: 'export',      label: '7. エクスポート',   dot: 'none' },
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: '編集',
+    items: [
+      { id: 'trim',       label: 'トリム',            dot: () => 'on' },
+      { id: 'cut',        label: '手動カット',         dot: (c) => c.cut_regions.length > 0 ? 'on' : null },
+      { id: 'processing', label: '音声処理',           dot: (c) => c.denoise_enabled ? 'on' : 'off' },
+      { id: 'silence',    label: '無音カット',         dot: (c) => c.silence_trim_enabled ? 'on' : 'off' },
+      { id: 'mix',        label: 'BGM / エンディング', dot: (c) => (c.bgm_filename || c.endscene_filename) ? 'on' : 'off' },
+    ],
+  },
+  {
+    label: '出力',
+    items: [
+      { id: 'export', label: 'エクスポート', dot: () => null },
+    ],
+  },
 ];
 
 // ── Stage icon as SVG string component ────────────────────────
@@ -52,10 +63,6 @@ function NavIcon({ id }: { id: SectionId }) {
   switch (id) {
     case 'source':
       return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>;
-    case 'overview':
-      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1.5H2V3zm0 4h12v1.5H2V7zm0 4h8v1.5H2V11z"/></svg>;
-    case 'preview':
-      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>;
     case 'trim':
       return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>;
     case 'cut':
@@ -69,63 +76,6 @@ function NavIcon({ id }: { id: SectionId }) {
     case 'export':
       return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>;
   }
-}
-
-// ── Overview pipeline summary ──────────────────────────────────
-function OverviewPanel({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
-  const { config } = useAppStore();
-  const items = [
-    { id: 'trim' as SectionId,       label: 'トリム',              desc: 'クラップ検出・前後カット',                          on: true  },
-    { id: 'processing' as SectionId, label: 'ノイズ除去',          desc: `Spectral モード · ${config.noise_gate_threshold} dB`,   on: config.denoise_enabled },
-    { id: 'processing' as SectionId, label: 'ラウドネス正規化',    desc: `目標 ${config.target_lufs} LUFS · EBU R128`,            on: true  },
-    { id: 'processing' as SectionId, label: 'ダイナミクス',        desc: `コンプレッサー ${config.comp_ratio}:1`,                  on: true  },
-    { id: 'mix' as SectionId,        label: 'BGM',                 desc: config.bgm_filename ? `${config.bgm_filename} · ${config.bgm_target_lufs} LUFS` : 'ファイル未設定', on: !!config.bgm_filename },
-    { id: 'mix' as SectionId,        label: 'エンドシーン',        desc: config.endscene_filename ?? 'ファイル未設定',             on: !!config.endscene_filename },
-    { id: 'silence' as SectionId,    label: '無音カット',          desc: `${config.silence_min_duration}秒以上 → ${config.silence_target_duration}秒に短縮`, on: config.silence_trim_enabled },
-  ];
-  return (
-    <div className="p-6 flex flex-col gap-4">
-      <div className="mb-1">
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.35px' }}>処理パイプライン</h2>
-        <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>ステージをクリックして詳細設定を開く</p>
-      </div>
-      <div className="flex flex-col gap-1">
-        {items.map((item, i) => (
-          <div
-            key={i}
-            onClick={() => onNavigate(item.id)}
-            className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-colors duration-100"
-            style={{ ':hover': { background: 'rgba(255,255,255,0.05)' } } as React.CSSProperties}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-            onMouseLeave={e => (e.currentTarget.style.background = '')}
-          >
-            <div style={{
-              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(255,255,255,0.09)',
-              border: '1px solid rgba(255,255,255,0.11)',
-              fontSize: 11, fontWeight: 700, color: 'var(--tg-t2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>{i + 1}</div>
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--tg-t1)', fontWeight: 500 }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 1 }}>{item.desc}</div>
-            </div>
-            <div style={{ marginLeft: 'auto' }}>
-              <span style={{
-                fontSize: 11, fontWeight: 600,
-                padding: '3px 9px', borderRadius: 100,
-                background: item.on ? 'rgba(48,209,88,0.15)' : 'rgba(255,255,255,0.06)',
-                color: item.on ? 'var(--tg-green)' : 'var(--tg-t3)',
-                border: `1px solid ${item.on ? 'rgba(48,209,88,0.2)' : 'rgba(255,255,255,0.09)'}`,
-              }}>
-                {item.on ? 'ON' : 'OFF'}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 // ── Main ───────────────────────────────────────────────────────
@@ -234,7 +184,6 @@ export default function Home() {
     : 'ファイル未選択';
 
   // ── Sidebar nav sections ────────────────────────────────────
-  const SOURCE_NAV: NavSection = { id: 'source', label: '音声ファイル', dot: 'none' };
 
   const navigate = (id: SectionId) => setActiveSection(id);
 
@@ -266,8 +215,6 @@ export default function Home() {
             )}
           </div>
         );
-      case 'overview':
-        return <OverviewPanel onNavigate={navigate} />;
       case 'cut':
         return <CutEditor />;
       default:
@@ -311,19 +258,38 @@ export default function Home() {
         >
           {/* Segmented preview/full */}
           {mounted && (
-            <div className="tg-seg">
-              <button
-                className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
-                onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
-              >
-                通常編集
-              </button>
-              <button
-                className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
-                onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
-              >
-                ショートプレビュー確認
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="tg-seg">
+                <button
+                  className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
+                  onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
+                >
+                  フル処理
+                </button>
+                <button
+                  className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
+                  onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
+                >
+                  プレビュー
+                </button>
+              </div>
+              {config.preview_mode && (
+                <select
+                  value={config.preview_duration}
+                  onChange={e => useAppStore.getState().updateConfig({ preview_duration: Number(e.target.value) })}
+                  style={{
+                    fontSize: 11, color: 'var(--tg-t1)',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 5, padding: '3px 6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {[10, 15, 20, 30, 45, 60].map(v => (
+                    <option key={v} value={v}>{v}秒</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -386,8 +352,8 @@ export default function Home() {
             {/* Source */}
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>ソース</div>
             <button
-              className={`tg-nav${activeSection === SOURCE_NAV.id ? ' active' : ''}`}
-              onClick={() => navigate(SOURCE_NAV.id)}
+              className={`tg-nav${activeSection === 'source' ? ' active' : ''}`}
+              onClick={() => navigate('source')}
             >
               <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === 'source' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
                 <NavIcon id="source" />
@@ -400,25 +366,33 @@ export default function Home() {
               )}
             </button>
 
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '8px 0' }} />
-
-            {/* Stages */}
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>処理ステージ</div>
-            {STAGES.map(s => (
-              <button
-                key={s.id}
-                className={`tg-nav${activeSection === s.id ? ' active' : ''}`}
-                onClick={() => navigate(s.id)}
-              >
-                <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === s.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                  <NavIcon id={s.id} />
+            {NAV_GROUPS.map(group => {
+              const dotStates = group.items.map(item => item.dot(config));
+              return (
+                <div key={group.label}>
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '8px 0' }} />
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{group.label}</div>
+                  {group.items.map((item, i) => {
+                    const dot = dotStates[i];
+                    return (
+                      <button
+                        key={item.id}
+                        className={`tg-nav${activeSection === item.id ? ' active' : ''}`}
+                        onClick={() => navigate(item.id)}
+                      >
+                        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === item.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                          <NavIcon id={item.id} />
+                        </div>
+                        <span style={{ fontSize: 13, color: activeSection === item.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{item.label}</span>
+                        {dot !== null && (
+                          <div className={`tg-dot ${dot === 'on' ? 'tg-dot-on' : 'tg-dot-off'}`} style={{ marginLeft: 'auto', flexShrink: 0 }} />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <span style={{ fontSize: 13, color: activeSection === s.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{s.label}</span>
-                {s.dot !== 'none' && s.dot && (
-                  <div className={`tg-dot ${s.dot === 'on' ? 'tg-dot-on' : 'tg-dot-off'}`} style={{ marginLeft: 'auto', flexShrink: 0 }} />
-                )}
-              </button>
-            ))}
+              );
+            })}
           </aside>
 
           {/* Main panel */}

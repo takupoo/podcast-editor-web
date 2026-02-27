@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { useState, useEffect } from 'react';
 import { saveFileToCache, loadFileFromCache, clearFileFromCache } from '@/lib/file-cache';
 
-export type ConfigSection = 'preview' | 'trim' | 'processing' | 'silence' | 'mix' | 'export';
+export type ConfigSection = 'trim' | 'processing' | 'silence' | 'mix' | 'export';
 
 interface ConfigPanelProps {
   activeSection: ConfigSection;
@@ -120,41 +120,6 @@ function StageHeader({ icon, title, desc, enabledKey }: {
 }
 
 // ── Section panels ─────────────────────────────────────────────
-
-function PreviewSection() {
-  const { config, updateConfig } = useAppStore();
-  return (
-    <div className="flex flex-col gap-4">
-      <StageHeader
-        icon={<span style={{ fontSize: 22 }}>🚀</span>}
-        title="プレビューモード"
-        desc="最初のN秒のみ処理して音質を素早く比較"
-        enabledKey="preview_mode"
-      />
-      <div className="tg-grp">
-        <GrpHeader>設定</GrpHeader>
-        {config.preview_mode && (
-          <Row
-            label="プレビュー時間"
-            hint="処理する長さ（推奨: 30秒）"
-            right={
-              <SliderRow
-                id="preview-duration"
-                min={10} max={60} step={5}
-                value={config.preview_duration}
-                onChange={v => updateConfig({ preview_duration: v })}
-                valueLabel={`${config.preview_duration} 秒`}
-              />
-            }
-          />
-        )}
-      </div>
-      <Notice>
-        <strong>プレビューモード</strong>を使うと、異なるノイズ除去方式を素早く比較できます。各設定で処理を実行 → ダウンロード → ローカル版と聴き比べ
-      </Notice>
-    </div>
-  );
-}
 
 function TrimSection() {
   const { config, updateConfig } = useAppStore();
@@ -530,7 +495,7 @@ function MixSection() {
             <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
           </svg>
         }
-        title="BGM・エンドシーン"
+        title="BGM / エンディング"
         desc="バックグラウンドミュージックと末尾クリップの合成"
       />
 
@@ -717,7 +682,6 @@ function ExportSection() {
 export function ConfigPanel({ activeSection }: ConfigPanelProps) {
   return (
     <div className="p-6">
-      {activeSection === 'preview'    && <PreviewSection />}
       {activeSection === 'trim'       && <TrimSection />}
       {activeSection === 'processing' && <ProcessingSection />}
       {activeSection === 'silence'    && <SilenceSection />}
