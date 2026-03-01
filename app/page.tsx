@@ -9,6 +9,10 @@ import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 import { CutEditor } from '@/components/CutEditor';
+const UserButton = dynamic(
+  () => import('@clerk/nextjs').then((m) => ({ default: m.UserButton })),
+  { ssr: false }
+);
 import { useTranslation, useLocaleStore } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
 
@@ -535,6 +539,9 @@ export default function Home() {
               ))}
             </div>
           )}
+          <div style={{ marginLeft: 12 }}>
+            <UserButton />
+          </div>
         </div>
 
         {/* ── Toolbar ───────────────────────────────────────── */}
