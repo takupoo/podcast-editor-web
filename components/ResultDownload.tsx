@@ -1,11 +1,15 @@
 'use client';
 
+import { useTranslation } from '@/lib/i18n';
+
 interface ResultDownloadProps {
   blob: Blob;
   filename?: string;
 }
 
 export function ResultDownload({ blob, filename = 'podcast_output.mp3' }: ResultDownloadProps) {
+  const { t } = useTranslation();
+
   const handleDownload = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -29,7 +33,7 @@ export function ResultDownload({ blob, filename = 'podcast_output.mp3' }: Result
           <circle cx="12" cy="12" r="10"/>
         </svg>
       </div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--tg-green)', marginBottom: 4 }}>処理完了！</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--tg-green)', marginBottom: 4 }}>{t('result.complete')}</div>
       <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginBottom: 16 }}>
         {(blob.size / 1024 / 1024).toFixed(2)} MB
       </div>
@@ -41,7 +45,7 @@ export function ResultDownload({ blob, filename = 'podcast_output.mp3' }: Result
         <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
         </svg>
-        ダウンロード
+        {t('result.download')}
       </button>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useTranslation } from '@/lib/i18n';
 
 interface FileUploaderProps {
   files: File[];
@@ -10,6 +11,8 @@ interface FileUploaderProps {
 }
 
 export function FileUploader({ files, onFilesChange, onRemoveFile }: FileUploaderProps) {
+  const { t } = useTranslation();
+
   const onDrop = useCallback(
     (accepted: File[]) => {
       if (accepted.length > 0) {
@@ -55,9 +58,9 @@ export function FileUploader({ files, onFilesChange, onRemoveFile }: FileUploade
         </svg>
 
         {/* Text */}
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>音声ファイルを追加</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>{t('fileUploader.addFile')}</div>
         <div style={{ fontSize: 12, color: 'var(--tg-t2)', textAlign: 'center' }}>
-          {isDragActive ? 'ここにドロップ' : '複数ファイルをドロップまたはクリックして選択'}
+          {isDragActive ? t('fileUploader.dropHere') : t('fileUploader.dropOrClick')}
         </div>
         <div style={{ fontSize: 11, color: 'var(--tg-t3)' }}>MP3 · WAV · M4A</div>
       </div>

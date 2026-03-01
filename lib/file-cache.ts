@@ -100,6 +100,26 @@ export async function loadFileFromCache(
   }
 }
 
+export async function checkFileInCache(
+  key: FileCacheKey
+): Promise<boolean> {
+  if (typeof indexedDB === 'undefined') return false;
+
+  try {
+    const db = await openDB();
+    const exists = await new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const request = tx.objectStore(STORE_NAME).count(key);
+      request.onsuccess = () => resolve(request.result > 0);
+      request.onerror = () => reject(request.error);
+      tx.oncomplete = () => db.close();
+    });
+    return exists;
+  } catch {
+    return false;
+  }
+}
+
 export async function clearFileFromCache(
   key: FileCacheKey
 ): Promise<void> {

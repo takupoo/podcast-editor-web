@@ -1,0 +1,196 @@
+export type Locale = 'en' | 'ja';
+
+export interface Translations {
+  nav: {
+    source: string;
+    audioFiles: string;
+    editing: string;
+    sync: string;
+    manualCut: string;
+    audioProcessing: string;
+    silenceCut: string;
+    bgmEnding: string;
+    output: string;
+    export: string;
+  };
+  toolbar: {
+    fullProcess: string;
+    preview: string;
+    reset: string;
+    processing: string;
+    runProcess: string;
+  };
+  status: {
+    processing: string;
+    processingDots: string;
+    complete: string;
+    ready: string;
+    readyShort: string;
+    noFile: string;
+    download: string;
+    notifyOnComplete: string;
+  };
+  notifications: {
+    completeTitle: string;
+    completeBody: string;
+    errorTitle: string;
+    errorBody: string;
+    errorOccurred: string;
+  };
+  fileUploader: {
+    addFile: string;
+    dropHere: string;
+    dropOrClick: string;
+  };
+  source: {
+    title: string;
+    desc: string;
+    browserNotice: string;
+  };
+  config: {
+    enabled: string;
+    trim: {
+      title: string;
+      desc: string;
+      detection: string;
+      clapThreshold: string;
+      clapThresholdHint: string;
+      margin: string;
+      preClap: string;
+      preClapHint: string;
+      postClap: string;
+      postClapHint: string;
+    };
+    processing: {
+      title: string;
+      desc: string;
+      denoiseAlgorithm: string;
+      spectral: string;
+      spectralDesc: string;
+      afftdn: string;
+      afftdnDesc: string;
+      anlmdn: string;
+      anlmdnDesc: string;
+      none: string;
+      noneDesc: string;
+      noiseFloor: string;
+      noiseFloorHint: string;
+      loudness: string;
+      targetLoudness: string;
+      targetLoudnessHint: string;
+      dynamics: string;
+      ratio: string;
+      ratioHint: string;
+      attack: string;
+      release: string;
+    };
+    silence: {
+      title: string;
+      desc: string;
+      conditions: string;
+      threshold: string;
+      thresholdHint: string;
+      minDuration: string;
+      minDurationHint: string;
+      afterCut: string;
+      afterCutHint: string;
+      notice: string;
+    };
+    mix: {
+      title: string;
+      desc: string;
+      bgmFile: string;
+      selectFile: string;
+      clear: string;
+      loadFromUrl: string;
+      loading: string;
+      urlPlaceholder: string;
+      bgmVolume: string;
+      bgmVolumeHint: string;
+      fadeIn: string;
+      fadeOut: string;
+      endsceneFile: string;
+      crossfade: string;
+      urlError: string;
+      urlAutoError: string;
+      savedInBrowser: string;
+    };
+    export: {
+      title: string;
+      desc: string;
+      format: string;
+      outputFormat: string;
+      bitrate: string;
+      bitrateNotice: string;
+    };
+  };
+  cutEditor: {
+    title: string;
+    desc: string;
+    syncing: string;
+    syncingDesc: string;
+    timeline: string;
+    markFrom: string;
+    markTo: string;
+    cancel: string;
+    startAt: string;
+    cutRegions: string;
+    deleteAll: string;
+    noCutRegions: string;
+    seconds: string;
+    play: string;
+    delete: string;
+    fitAll: string;
+    needFiles: string;
+    needFilesDesc: string;
+    syncNotice: string;
+    overlapAlert: string;
+  };
+  stages: {
+    loading: string;
+    trim: string;
+    denoise: string;
+    loudness: string;
+    dynamics: string;
+    mix: string;
+    silence: string;
+    bgm: string;
+    endscene: string;
+    export: string;
+    complete: string;
+    error: string;
+  };
+  result: {
+    complete: string;
+    download: string;
+  };
+  common: {
+    seconds: string;
+  };
+  howToUse: {
+    title: string;
+    subtitle: string;
+    step1Title: string;
+    step1Desc: string;
+    step2Title: string;
+    step2Desc: string;
+    step3Title: string;
+    step3Desc: string;
+    step4Title: string;
+    step4Desc: string;
+    step5Title: string;
+    step5Desc: string;
+    step6Title: string;
+    step6Desc: string;
+    tips: string;
+    tip1: string;
+    tip2: string;
+  };
+  fileCacheStatus: {
+    previousFile: string;
+    restored: string;
+    restoredUrl: string;
+    restoredCache: string;
+    selected: string;
+  };
+}

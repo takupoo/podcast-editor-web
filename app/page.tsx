@@ -9,6 +9,8 @@ import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 import { CutEditor } from '@/components/CutEditor';
+import { useTranslation, useLocaleStore } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
 
 // SSR時のHydrationエラーを防ぐためSSRを無効化
 import type { ConfigSection } from '@/components/ConfigPanel';
@@ -29,30 +31,30 @@ type SectionId =
 
 interface NavItem {
   id: SectionId;
-  label: string;
+  labelKey: string;
   dot: (config: ReturnType<typeof useAppStore.getState>['config']) => 'on' | 'off' | null;
 }
 
 interface NavGroup {
-  label: string;
+  labelKey: string;
   items: NavItem[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: '編集',
+    labelKey: 'nav.editing',
     items: [
-      { id: 'trim',       label: '同期',              dot: () => 'on' },
-      { id: 'cut',        label: '手動カット',         dot: (c) => c.cut_regions.length > 0 ? 'on' : null },
-      { id: 'processing', label: '音声加工',           dot: (c) => c.denoise_enabled ? 'on' : 'off' },
-      { id: 'silence',    label: '無音カット',         dot: (c) => c.silence_trim_enabled ? 'on' : 'off' },
-      { id: 'mix',        label: 'BGM / エンディング', dot: (c) => (c.bgm_filename || c.endscene_filename) ? 'on' : 'off' },
+      { id: 'trim',       labelKey: 'nav.sync',             dot: () => 'on' },
+      { id: 'cut',        labelKey: 'nav.manualCut',        dot: (c) => c.cut_regions.length > 0 ? 'on' : null },
+      { id: 'processing', labelKey: 'nav.audioProcessing',  dot: (c) => c.denoise_enabled ? 'on' : 'off' },
+      { id: 'silence',    labelKey: 'nav.silenceCut',       dot: (c) => c.silence_trim_enabled ? 'on' : 'off' },
+      { id: 'mix',        labelKey: 'nav.bgmEnding',        dot: (c) => (c.bgm_filename || c.endscene_filename) ? 'on' : 'off' },
     ],
   },
   {
-    label: '出力',
+    labelKey: 'nav.output',
     items: [
-      { id: 'export', label: 'エクスポート', dot: () => null },
+      { id: 'export', labelKey: 'nav.export', dot: () => null },
     ],
   },
 ];
@@ -80,6 +82,8 @@ function NavIcon({ id }: { id: SectionId }) {
 
 // ── How to use modal ──────────────────────────────────────────
 function HowToUseModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -91,38 +95,38 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
   const steps = [
     {
       num: '1',
-      title: '音声ファイルをアップロード',
-      desc: '話者A・Bの音声ファイル（MP3 / WAV / M4A）を2つドラッグ＆ドロップ、またはクリックして選択します。',
+      title: t('howToUse.step1Title'),
+      desc: t('howToUse.step1Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>,
     },
     {
       num: '2',
-      title: '同期（クラップ検出）',
-      desc: '収録開始時の手拍子（クラップ）を自動検出し、2つの音声トラックの開始位置を揃えます。',
+      title: t('howToUse.step2Title'),
+      desc: t('howToUse.step2Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>,
     },
     {
       num: '3',
-      title: '手動カット（任意）',
-      desc: 'タイムライン上で不要な部分をマークして削除できます。再生しながらイン／アウト点を設定します。',
+      title: t('howToUse.step3Title'),
+      desc: t('howToUse.step3Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>,
     },
     {
       num: '4',
-      title: '音声加工',
-      desc: 'ノイズ除去、ラウドネス正規化（-16 LUFS）、ダイナミクス処理（コンプレッサー＋リミッター）を設定します。',
+      title: t('howToUse.step4Title'),
+      desc: t('howToUse.step4Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>,
     },
     {
       num: '5',
-      title: '無音カット・BGM追加（任意）',
-      desc: '長い無音部分を自動で短縮したり、BGMやエンディング音声をミックスできます。',
+      title: t('howToUse.step5Title'),
+      desc: t('howToUse.step5Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>,
     },
     {
       num: '6',
-      title: '処理実行 & ダウンロード',
-      desc: '「処理実行」ボタンをクリックすると、すべての処理がブラウザ内で実行されます。完了後、結果をダウンロードできます。',
+      title: t('howToUse.step6Title'),
+      desc: t('howToUse.step6Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>,
     },
   ];
@@ -161,10 +165,10 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
         }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>
-              使い方ガイド
+              {t('howToUse.title')}
             </h2>
             <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 3 }}>
-              Spectratrek でポッドキャストを編集する手順
+              {t('howToUse.subtitle')}
             </p>
           </div>
           <button
@@ -232,9 +236,9 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
           <div style={{ marginTop: 16 }} className="tg-notice">
             <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontWeight: 600, color: 'var(--tg-t1)', fontSize: 12 }}>Tips</span>
-              <span>まず「プレビュー」モードで短い時間だけ試聴してから、「フル処理」で本番実行するのがおすすめです。</span>
-              <span>すべての処理はブラウザ内で完結するため、音声データがサーバーに送信されることはありません。</span>
+              <span style={{ fontWeight: 600, color: 'var(--tg-t1)', fontSize: 12 }}>{t('howToUse.tips')}</span>
+              <span>{t('howToUse.tip1')}</span>
+              <span>{t('howToUse.tip2')}</span>
             </div>
           </div>
         </div>
@@ -246,6 +250,9 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
 // ── Main ───────────────────────────────────────────────────────
 export default function Home() {
   const { config, files, setFiles, removeFile, resetConfig } = useAppStore();
+  const { t, locale } = useTranslation();
+  const setLocale = useLocaleStore((s) => s.setLocale);
+
   const [mounted, setMounted]       = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>('source');
   const [processing, setProcessing] = useState(false);
@@ -256,6 +263,11 @@ export default function Home() {
   const [showHelp, setShowHelp]     = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // Set html lang attribute
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -297,11 +309,11 @@ export default function Home() {
     try {
       const output = await processPodcast(files[0], files[1], config, p => setProgress(p));
       setResult(output);
-      setActiveSection('source'); // 処理完了時に「音声ファイル」セクションに戻る
-      notify('処理完了！', 'ポッドキャストの編集が完了しました。');
+      setActiveSection('source');
+      notify(t('notifications.completeTitle'), t('notifications.completeBody'));
     } catch (error) {
-      setProgress({ stage: 'error', percent: 0, message: `エラーが発生しました: ${error}` });
-      notify('処理エラー', 'ポッドキャストの編集中にエラーが発生しました。');
+      setProgress({ stage: 'error', percent: 0, message: `${t('notifications.errorOccurred')} ${error}` });
+      notify(t('notifications.errorTitle'), t('notifications.errorBody'));
     } finally {
       setProcessing(false);
     }
@@ -323,22 +335,22 @@ export default function Home() {
   const canProcess = files.length >= 2 && !processing;
 
   const processLabel = processing
-    ? '処理中...'
+    ? t('toolbar.processing')
     : (mounted && config.preview_mode)
-      ? `プレビュー（${config.preview_duration}秒）`
-      : '処理実行';
+      ? `${t('toolbar.preview')}(${config.preview_duration}${t('common.seconds')})`
+      : t('toolbar.runProcess');
 
   const statusText = processing
-    ? (progress?.message ?? '処理中...')
+    ? (progress?.message ?? t('status.processingDots'))
     : result
-      ? '処理完了'
+      ? t('status.complete')
       : files.length >= 2
-        ? '処理準備完了'
-        : '準備完了';
+        ? t('status.ready')
+        : t('status.readyShort');
 
   const fileInfoText = files.length > 0
     ? files.map(f => f.name).join('  ·  ')
-    : 'ファイル未選択';
+    : t('status.noFile');
 
   // ── Sidebar nav sections ────────────────────────────────────
 
@@ -351,13 +363,13 @@ export default function Home() {
         return (
           <div className="p-6 flex flex-col gap-5">
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>音声ファイル</h2>
-              <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>処理対象の音声ファイルを選択（話者A・B）</p>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('source.title')}</h2>
+              <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('source.desc')}</p>
             </div>
             <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
             <div className="tg-notice">
               <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
-              <span>すべての処理はブラウザ内で完結します。ファイルはサーバーに送信されません。</span>
+              <span>{t('source.browserNotice')}</span>
             </div>
             {(progress || result) && (
               <div className="flex flex-col gap-4 mt-2">
@@ -402,30 +414,21 @@ export default function Home() {
           }}>
             Spectratrek
           </div>
-          <button
-            onClick={() => setShowHelp(true)}
-            style={{
-              width: 26, height: 26, borderRadius: 8, marginLeft: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.09)',
-              color: 'var(--tg-t2)', cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.14)';
-              e.currentTarget.style.color = 'var(--tg-t1)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-              e.currentTarget.style.color = 'var(--tg-t2)';
-            }}
-            title="使い方ガイド"
-          >
-            <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zm-.5-2h1v1h-1v-1zm.5-7a2.5 2.5 0 0 0-2.5 2.5h1.2A1.3 1.3 0 0 1 8 5.7c.7 0 1.3.6 1.3 1.3 0 .5-.3.9-.7 1.1-.6.3-1.1 1-1.1 1.7v.2h1.2v-.2c0-.4.2-.7.6-.9.7-.4 1.2-1.1 1.2-1.9A2.5 2.5 0 0 0 8 4.5z"/>
-            </svg>
-          </button>
+          <div style={{ flex: 1 }} />
+          {/* Language switcher */}
+          {mounted && (
+            <div className="tg-seg" style={{ marginLeft: 'auto' }}>
+              {(['en', 'ja'] as Locale[]).map(l => (
+                <button
+                  key={l}
+                  className={`tg-seg-btn${locale === l ? ' active' : ''}`}
+                  onClick={() => setLocale(l)}
+                >
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Toolbar ───────────────────────────────────────── */}
@@ -445,13 +448,13 @@ export default function Home() {
                   className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
                   onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
                 >
-                  フル処理
+                  {t('toolbar.fullProcess')}
                 </button>
                 <button
                   className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
                   onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
                 >
-                  プレビュー
+                  {t('toolbar.preview')}
                 </button>
               </div>
               {config.preview_mode && (
@@ -467,7 +470,7 @@ export default function Home() {
                   }}
                 >
                   {[10, 15, 20, 30, 45, 60].map(v => (
-                    <option key={v} value={v}>{v}秒</option>
+                    <option key={v} value={v}>{v}{t('common.seconds')}</option>
                   ))}
                 </select>
               )}
@@ -490,7 +493,7 @@ export default function Home() {
             }}>
               <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {files.length}個のファイル
+                {files.length}
               </span>
             </div>
           )}
@@ -498,7 +501,7 @@ export default function Home() {
           {/* Reset */}
           <button className="tg-btn" onClick={resetConfig}>
             <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
-            リセット
+            {t('toolbar.reset')}
           </button>
 
           {/* Process */}
@@ -521,7 +524,7 @@ export default function Home() {
             style={{ width: 220, overflowY: 'auto' }}
           >
             {/* Source */}
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>ソース</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{t('nav.source')}</div>
             <button
               className={`tg-nav${activeSection === 'source' ? ' active' : ''}`}
               onClick={() => navigate('source')}
@@ -529,7 +532,7 @@ export default function Home() {
               <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === 'source' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
                 <NavIcon id="source" />
               </div>
-              <span style={{ fontSize: 13, color: activeSection === 'source' ? 'var(--tg-t1)' : 'var(--tg-t2)' }}>音声ファイル</span>
+              <span style={{ fontSize: 13, color: activeSection === 'source' ? 'var(--tg-t1)' : 'var(--tg-t2)' }}>{t('nav.audioFiles')}</span>
               {files.length > 0 && (
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--tg-t3)' }}>
                   {files.length}
@@ -540,9 +543,9 @@ export default function Home() {
             {NAV_GROUPS.map(group => {
               const dotStates = group.items.map(item => item.dot(config));
               return (
-                <div key={group.label}>
+                <div key={group.labelKey}>
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '8px 0' }} />
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{group.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{t(group.labelKey as Parameters<typeof t>[0])}</div>
                   {group.items.map((item, i) => {
                     const dot = dotStates[i];
                     return (
@@ -554,7 +557,7 @@ export default function Home() {
                         <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === item.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
                           <NavIcon id={item.id} />
                         </div>
-                        <span style={{ fontSize: 13, color: activeSection === item.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{item.label}</span>
+                        <span style={{ fontSize: 13, color: activeSection === item.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{t(item.labelKey as Parameters<typeof t>[0])}</span>
                         {dot !== null && (
                           <div className={`tg-dot ${dot === 'on' ? 'tg-dot-on' : 'tg-dot-off'}`} style={{ marginLeft: 'auto', flexShrink: 0 }} />
                         )}
@@ -622,11 +625,11 @@ export default function Home() {
                   <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                     <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
                   </svg>
-                  ダウンロード
+                  {t('status.download')}
                 </button>
               )}
               {notifPerm === 'granted' && !result && (
-                <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>🔔 完了時に通知</span>
+                <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>{t('status.notifyOnComplete')}</span>
               )}
               <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: (notifPerm === 'granted' && !result) ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
             </>
@@ -637,7 +640,7 @@ export default function Home() {
                 background: 'var(--tg-accent)',
                 boxShadow: '0 0 6px rgba(10,132,255,.5)',
               }} />
-              <span style={{ fontSize: 11, color: 'var(--tg-t1)', fontWeight: 500 }}>{progress?.stage || '処理中'}</span>
+              <span style={{ fontSize: 11, color: 'var(--tg-t1)', fontWeight: 500 }}>{progress?.stage || t('status.processing')}</span>
               <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', maxWidth: 200 }}>
                 <div style={{
                   height: '100%',
@@ -652,15 +655,12 @@ export default function Home() {
                 {progress?.percent || 0}%
               </span>
               <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                {progress?.message || '処理中...'}
+                {progress?.message || t('status.processingDots')}
               </span>
             </>
           )}
         </div>
       </div>
-
-      {/* Help modal */}
-      {showHelp && <HowToUseModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

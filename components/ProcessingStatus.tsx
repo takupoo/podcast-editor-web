@@ -1,24 +1,29 @@
 'use client';
 
 import { ProcessProgress } from '@/lib/pipeline/types';
+import { useTranslation } from '@/lib/i18n';
+import type { TranslationKey } from '@/lib/i18n';
 
-const stageNames: Record<string, string> = {
-  loading:   'ロード中',
-  trim:      '同期',
-  denoise:   'ノイズ除去',
-  loudness:  'ラウドネス正規化',
-  dynamics:  'ダイナミクス処理',
-  mix:       'ミックス',
-  silence:   '無音カット',
-  bgm:       'BGM追加',
-  endscene:  'エンドシーン追加',
-  export:    'エクスポート',
-  complete:  '完了',
-  error:     'エラー',
+const stageKeys: Record<string, TranslationKey> = {
+  loading:   'stages.loading',
+  trim:      'stages.trim',
+  denoise:   'stages.denoise',
+  loudness:  'stages.loudness',
+  dynamics:  'stages.dynamics',
+  mix:       'stages.mix',
+  silence:   'stages.silence',
+  bgm:       'stages.bgm',
+  endscene:  'stages.endscene',
+  export:    'stages.export',
+  complete:  'stages.complete',
+  error:     'stages.error',
 };
 
 export function ProcessingStatus({ progress }: { progress: ProcessProgress }) {
-  const stageName = stageNames[progress.stage] ?? progress.stage;
+  const { t } = useTranslation();
+
+  const stageKey = stageKeys[progress.stage];
+  const stageName = stageKey ? t(stageKey) : progress.stage;
   const isError   = progress.stage === 'error';
   const isDone    = progress.stage === 'complete';
 

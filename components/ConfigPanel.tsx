@@ -4,7 +4,8 @@ import { useAppStore } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useState, useEffect } from 'react';
-import { saveFileToCache, loadFileFromCache, clearFileFromCache } from '@/lib/file-cache';
+import { saveFileToCache, loadFileFromCache, clearFileFromCache, checkFileInCache } from '@/lib/file-cache';
+import { useTranslation } from '@/lib/i18n';
 
 export type ConfigSection = 'trim' | 'processing' | 'silence' | 'mix' | 'export';
 
@@ -22,6 +23,20 @@ function toRawUrl(url: string): string {
     /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//,
     'https://raw.githubusercontent.com/$1/'
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
 }
 
 // ── Shared sub-components ──────────────────────────────────────
@@ -95,6 +110,7 @@ function StageHeader({ icon, title, desc, enabledKey }: {
   enabledKey?: keyof ReturnType<typeof useAppStore.getState>['config'];
 }) {
   const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
   const enabled = enabledKey ? config[enabledKey] as boolean : undefined;
 
   return (
@@ -108,7 +124,7 @@ function StageHeader({ icon, title, desc, enabledKey }: {
       </div>
       {enabledKey && (
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--tg-t2)' }}>有効</span>
+          <span style={{ fontSize: 12, color: 'var(--tg-t2)' }}>{t('config.enabled')}</span>
           <Switch
             checked={enabled}
             onCheckedChange={(v) => updateConfig({ [enabledKey]: v } as Parameters<typeof updateConfig>[0])}
@@ -119,10 +135,67 @@ function StageHeader({ icon, title, desc, enabledKey }: {
   );
 }
 
+// ── FileStatus component ──────────────────────────────────────
+type CacheStatus = 'none' | 'saving' | 'saved' | 'error';
+
+function FileStatus({ file, cacheStatus, url, onClear }: {
+  file: File;
+  cacheStatus: CacheStatus;
+  url?: string;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 14px',
+      background: 'rgba(48,209,88,0.06)',
+      border: '1px solid rgba(48,209,88,0.2)',
+      borderRadius: 10,
+    }}>
+      <svg style={{ width: 16, height: 16, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor">
+        <path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/>
+      </svg>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {file.name}
+          </span>
+          {cacheStatus === 'saved' && (
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 100,
+              background: 'rgba(48,209,88,0.15)', color: 'var(--tg-green)',
+              border: '1px solid rgba(48,209,88,0.3)',
+              whiteSpace: 'nowrap',
+            }}>
+              {t('config.mix.savedInBrowser')}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2, display: 'flex', gap: 8 }}>
+          <span>{formatFileSize(file.size)}</span>
+          {url && <span>{extractDomain(url)}</span>}
+        </div>
+      </div>
+      <button
+        onClick={onClear}
+        style={{
+          fontSize: 11, color: 'var(--tg-red)', cursor: 'pointer',
+          background: 'none', border: 'none', flexShrink: 0,
+        }}
+      >
+        {t('config.mix.clear')}
+      </button>
+    </div>
+  );
+}
+
 // ── Section panels ─────────────────────────────────────────────
 
 function TrimSection() {
   const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <StageHeader
@@ -133,14 +206,14 @@ function TrimSection() {
             <path d="M6 9 L2 13"/><path d="M6 9 L10 13"/><path d="M18 9 L14 13"/><path d="M18 9 L22 13"/>
           </svg>
         }
-        title="同期"
-        desc="クラップ音検出による前後カット"
+        title={t('config.trim.title')}
+        desc={t('config.trim.desc')}
       />
       <div className="tg-grp" style={{ background: 'linear-gradient(145deg,rgba(255,159,10,0.06),transparent)' }}>
-        <GrpHeader>検出</GrpHeader>
+        <GrpHeader>{t('config.trim.detection')}</GrpHeader>
         <Row
-          label="クラップ検出閾値"
-          hint="低いほど小さい音でも検出（推奨: -10dB）"
+          label={t('config.trim.clapThreshold')}
+          hint={t('config.trim.clapThresholdHint')}
           right={
             <SliderRow
               id="clap-threshold" min={-20} max={-5} step={1}
@@ -152,28 +225,28 @@ function TrimSection() {
         />
       </div>
       <div className="tg-grp">
-        <GrpHeader>余白</GrpHeader>
+        <GrpHeader>{t('config.trim.margin')}</GrpHeader>
         <Row
-          label="クラップ前の余白"
-          hint="クラップ前に残す時間"
+          label={t('config.trim.preClap')}
+          hint={t('config.trim.preClapHint')}
           right={
             <SliderRow
               id="pre-clap-margin" min={0} max={3} step={0.1}
               value={config.pre_clap_margin}
               onChange={v => updateConfig({ pre_clap_margin: v })}
-              valueLabel={`${config.pre_clap_margin.toFixed(1)} 秒`}
+              valueLabel={`${config.pre_clap_margin.toFixed(1)} ${t('common.seconds')}`}
             />
           }
         />
         <Row
-          label="クラップ後カット"
-          hint="クラップから何秒後から録音開始するか（0=クラップ残す）"
+          label={t('config.trim.postClap')}
+          hint={t('config.trim.postClapHint')}
           right={
             <SliderRow
               id="post-clap-cut" min={0} max={2} step={0.1}
               value={config.post_clap_cut}
               onChange={v => updateConfig({ post_clap_cut: v })}
-              valueLabel={`${config.post_clap_cut.toFixed(1)} 秒`}
+              valueLabel={`${config.post_clap_cut.toFixed(1)} ${t('common.seconds')}`}
             />
           }
         />
@@ -184,6 +257,7 @@ function TrimSection() {
 
 function ProcessingSection() {
   const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       {/* ノイズ除去 */}
@@ -193,14 +267,14 @@ function ProcessingSection() {
             <path d="M2 12 Q5 4 8 12 Q11 20 14 12 Q17 4 20 8"/><path d="M20 8 L22 8"/>
           </svg>
         }
-        title="ノイズ除去 / ラウドネス / ダイナミクス"
-        desc="音声加工パイプライン（Stage 2–4）"
+        title={t('config.processing.title')}
+        desc={t('config.processing.desc')}
         enabledKey="denoise_enabled"
       />
 
       {/* Denoise method */}
       <div className="tg-grp">
-        <GrpHeader>ノイズ除去アルゴリズム</GrpHeader>
+        <GrpHeader>{t('config.processing.denoiseAlgorithm')}</GrpHeader>
         <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
             <label
@@ -223,16 +297,16 @@ function ProcessingSection() {
               />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>
-                  {method === 'spectral' && 'スペクトル減算（推奨）'}
-                  {method === 'afftdn' && 'afftdn（FFTベース）'}
-                  {method === 'anlmdn' && 'anlmdn（NLMeans）'}
-                  {method === 'none' && 'なし（フィルタのみ）'}
+                  {method === 'spectral' && t('config.processing.spectral')}
+                  {method === 'afftdn' && t('config.processing.afftdn')}
+                  {method === 'anlmdn' && t('config.processing.anlmdn')}
+                  {method === 'none' && t('config.processing.none')}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>
-                  {method === 'spectral' && '録音内の静かなフレームからノイズを学習。サー音・キーン音・ファン音に最も効果的。'}
-                  {method === 'afftdn' && 'FFTベース。時間的ノイズ追跡あり。軽量で定常ノイズに効果的。'}
-                  {method === 'anlmdn' && '非局所平均ベース。高品質だが処理が重い。'}
-                  {method === 'none' && 'highpass + lowpassのみ。ノイズ除去なし。'}
+                  {method === 'spectral' && t('config.processing.spectralDesc')}
+                  {method === 'afftdn' && t('config.processing.afftdnDesc')}
+                  {method === 'anlmdn' && t('config.processing.anlmdnDesc')}
+                  {method === 'none' && t('config.processing.noneDesc')}
                 </div>
               </div>
             </label>
@@ -240,8 +314,8 @@ function ProcessingSection() {
         </div>
         {config.denoise_method !== 'none' && (
           <Row
-            label="ノイズフロア閾値"
-            hint="低いほど弱いノイズも除去（推奨: -50dB）"
+            label={t('config.processing.noiseFloor')}
+            hint={t('config.processing.noiseFloorHint')}
             right={
               <SliderRow
                 id="noise-gate-threshold" min={-60} max={-30} step={5}
@@ -256,10 +330,10 @@ function ProcessingSection() {
 
       {/* Loudness */}
       <div className="tg-grp">
-        <GrpHeader>ラウドネス正規化（EBU R128）</GrpHeader>
+        <GrpHeader>{t('config.processing.loudness')}</GrpHeader>
         <Row
-          label="目標ラウドネス"
-          hint="ポッドキャスト標準: -16 LUFS"
+          label={t('config.processing.targetLoudness')}
+          hint={t('config.processing.targetLoudnessHint')}
           right={
             <SliderRow
               id="target-lufs" min={-20} max={-12} step={0.5}
@@ -284,10 +358,10 @@ function ProcessingSection() {
 
       {/* Dynamics */}
       <div className="tg-grp">
-        <GrpHeader>ダイナミクス（コンプレッサー）</GrpHeader>
+        <GrpHeader>{t('config.processing.dynamics')}</GrpHeader>
         <Row
-          label="レシオ"
-          hint="大きいほど圧縮が強い（推奨: 4:1）"
+          label={t('config.processing.ratio')}
+          hint={t('config.processing.ratioHint')}
           right={
             <SliderRow
               id="comp-ratio" min={2} max={10} step={1}
@@ -298,7 +372,7 @@ function ProcessingSection() {
           }
         />
         <Row
-          label="アタック"
+          label={t('config.processing.attack')}
           right={
             <SliderRow
               id="comp-attack" min={1} max={100} step={1}
@@ -309,7 +383,7 @@ function ProcessingSection() {
           }
         />
         <Row
-          label="リリース"
+          label={t('config.processing.release')}
           right={
             <SliderRow
               id="comp-release" min={10} max={500} step={10}
@@ -326,6 +400,7 @@ function ProcessingSection() {
 
 function SilenceSection() {
   const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <StageHeader
@@ -334,15 +409,15 @@ function SilenceSection() {
             <path d="M9 9v6M12 5v14M15 9v6M3 12h3M18 12h3"/>
           </svg>
         }
-        title="無音カット"
-        desc="長い沈黙を短縮してテンポを改善"
+        title={t('config.silence.title')}
+        desc={t('config.silence.desc')}
         enabledKey="silence_trim_enabled"
       />
       <div className="tg-grp">
-        <GrpHeader>検出条件</GrpHeader>
+        <GrpHeader>{t('config.silence.conditions')}</GrpHeader>
         <Row
-          label="無音判定閾値"
-          hint="この音量以下を無音とみなす"
+          label={t('config.silence.threshold')}
+          hint={t('config.silence.thresholdHint')}
           right={
             <SliderRow
               id="silence-threshold" min={-50} max={-20} step={1}
@@ -353,32 +428,32 @@ function SilenceSection() {
           }
         />
         <Row
-          label="最小無音時間"
-          hint="この秒数以上続く無音をカット対象にする"
+          label={t('config.silence.minDuration')}
+          hint={t('config.silence.minDurationHint')}
           right={
             <SliderRow
               id="silence-min-duration" min={0.5} max={10} step={0.5}
               value={config.silence_min_duration}
               onChange={v => updateConfig({ silence_min_duration: v })}
-              valueLabel={`${config.silence_min_duration.toFixed(1)} 秒`}
+              valueLabel={`${config.silence_min_duration.toFixed(1)} ${t('common.seconds')}`}
             />
           }
         />
         <Row
-          label="カット後の長さ"
-          hint="無音を何秒に詰めるか"
+          label={t('config.silence.afterCut')}
+          hint={t('config.silence.afterCutHint')}
           right={
             <SliderRow
               id="silence-target-duration" min={0.1} max={3} step={0.1}
               value={config.silence_target_duration}
               onChange={v => updateConfig({ silence_target_duration: v })}
-              valueLabel={`${config.silence_target_duration.toFixed(1)} 秒`}
+              valueLabel={`${config.silence_target_duration.toFixed(1)} ${t('common.seconds')}`}
             />
           }
         />
       </div>
       <Notice variant="warn">
-        <strong>無音カット</strong>はミックス後に適用されます。両方の話者が無音の区間のみがカット対象になります。
+        <strong>{t('config.silence.title')}</strong>{t('config.silence.notice').replace(t('config.silence.title'), '')}
       </Notice>
     </div>
   );
@@ -386,10 +461,11 @@ function SilenceSection() {
 
 function MixSection() {
   const { config, updateConfig } = useAppStore();
+  const { t, tf } = useTranslation();
   const [bgmFile, setBgmFile]             = useState<File | null>(null);
   const [endsceneFile, setEndsceneFile]   = useState<File | null>(null);
-  const [bgmFromCache, setBgmFromCache]   = useState(false);
-  const [endsceneFromCache, setEndsceneFromCache] = useState(false);
+  const [bgmCacheStatus, setBgmCacheStatus] = useState<CacheStatus>('none');
+  const [endsceneCacheStatus, setEndsceneCacheStatus] = useState<CacheStatus>('none');
   const [cacheLoading, setCacheLoading]   = useState(true);
   const [bgmUrl, setBgmUrl]               = useState(config.bgm_url ?? '');
   const [bgmUrlLoading, setBgmUrlLoading] = useState(false);
@@ -398,40 +474,55 @@ function MixSection() {
   const [endsceneUrlLoading, setEndsceneUrlLoading] = useState(false);
   const [endsceneUrlError, setEndsceneUrlError]     = useState<string | null>(null);
 
-  // 自動復元
+  // 自動復元: まず IndexedDB → キャッシュミス + URL あり → fetch → キャッシュ保存
   useEffect(() => {
     let cancelled = false;
     async function restoreFiles() {
       try {
-        if (config.bgm_url) {
+        // BGM 復元
+        const bgmCached = await loadFileFromCache('bgm');
+        if (!cancelled && bgmCached) {
+          setBgmFile(bgmCached);
+          setBgmCacheStatus('saved');
+          updateConfig({ bgm: bgmCached, bgm_filename: bgmCached.name });
+        } else if (!cancelled && config.bgm_url) {
           try {
             const res = await fetch(config.bgm_url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const buffer = await res.arrayBuffer();
             const filename = config.bgm_filename ?? extractFilename(config.bgm_url);
             const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
-            if (!cancelled) { setBgmFile(file); setBgmFromCache(true); updateConfig({ bgm: file }); }
+            if (!cancelled) {
+              setBgmFile(file);
+              updateConfig({ bgm: file });
+              saveFileToCache('bgm', file).then(() => { if (!cancelled) setBgmCacheStatus('saved'); });
+            }
           } catch {
-            if (!cancelled) setBgmUrlError('URLからの自動読み込みに失敗しました');
+            if (!cancelled) setBgmUrlError(t('config.mix.urlAutoError'));
           }
-        } else {
-          const cached = await loadFileFromCache('bgm');
-          if (!cancelled && cached) { setBgmFile(cached); setBgmFromCache(true); updateConfig({ bgm: cached, bgm_filename: cached.name }); }
         }
-        if (config.endscene_url) {
+
+        // Endscene 復元
+        const endsceneCached = await loadFileFromCache('endscene');
+        if (!cancelled && endsceneCached) {
+          setEndsceneFile(endsceneCached);
+          setEndsceneCacheStatus('saved');
+          updateConfig({ endscene: endsceneCached, endscene_filename: endsceneCached.name });
+        } else if (!cancelled && config.endscene_url) {
           try {
             const res = await fetch(config.endscene_url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const buffer = await res.arrayBuffer();
             const filename = config.endscene_filename ?? extractFilename(config.endscene_url);
             const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
-            if (!cancelled) { setEndsceneFile(file); setEndsceneFromCache(true); updateConfig({ endscene: file }); }
+            if (!cancelled) {
+              setEndsceneFile(file);
+              updateConfig({ endscene: file });
+              saveFileToCache('endscene', file).then(() => { if (!cancelled) setEndsceneCacheStatus('saved'); });
+            }
           } catch {
-            if (!cancelled) setEndsceneUrlError('URLからの自動読み込みに失敗しました');
+            if (!cancelled) setEndsceneUrlError(t('config.mix.urlAutoError'));
           }
-        } else {
-          const cached = await loadFileFromCache('endscene');
-          if (!cancelled && cached) { setEndsceneFile(cached); setEndsceneFromCache(true); updateConfig({ endscene: cached, endscene_filename: cached.name }); }
         }
       } finally {
         if (!cancelled) setCacheLoading(false);
@@ -443,14 +534,36 @@ function MixSection() {
 
   const handleBgmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setBgmFile(file); setBgmFromCache(false); updateConfig({ bgm: file, bgm_filename: file.name, bgm_url: undefined }); saveFileToCache('bgm', file); }
+    if (file) {
+      setBgmFile(file);
+      setBgmCacheStatus('saving');
+      updateConfig({ bgm: file, bgm_filename: file.name, bgm_url: undefined });
+      saveFileToCache('bgm', file)
+        .then(() => setBgmCacheStatus('saved'))
+        .catch(() => setBgmCacheStatus('error'));
+    }
   };
   const handleEndsceneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setEndsceneFile(file); setEndsceneFromCache(false); updateConfig({ endscene: file, endscene_filename: file.name, endscene_url: undefined }); saveFileToCache('endscene', file); }
+    if (file) {
+      setEndsceneFile(file);
+      setEndsceneCacheStatus('saving');
+      updateConfig({ endscene: file, endscene_filename: file.name, endscene_url: undefined });
+      saveFileToCache('endscene', file)
+        .then(() => setEndsceneCacheStatus('saved'))
+        .catch(() => setEndsceneCacheStatus('error'));
+    }
   };
-  const handleClearBgm = () => { setBgmFile(null); setBgmFromCache(false); setBgmUrl(''); setBgmUrlError(null); updateConfig({ bgm: undefined, bgm_filename: undefined, bgm_url: undefined }); clearFileFromCache('bgm'); };
-  const handleClearEndscene = () => { setEndsceneFile(null); setEndsceneFromCache(false); setEndsceneUrl(''); setEndsceneUrlError(null); updateConfig({ endscene: undefined, endscene_filename: undefined, endscene_url: undefined }); clearFileFromCache('endscene'); };
+  const handleClearBgm = () => {
+    setBgmFile(null); setBgmCacheStatus('none'); setBgmUrl(''); setBgmUrlError(null);
+    updateConfig({ bgm: undefined, bgm_filename: undefined, bgm_url: undefined });
+    clearFileFromCache('bgm');
+  };
+  const handleClearEndscene = () => {
+    setEndsceneFile(null); setEndsceneCacheStatus('none'); setEndsceneUrl(''); setEndsceneUrlError(null);
+    updateConfig({ endscene: undefined, endscene_filename: undefined, endscene_url: undefined });
+    clearFileFromCache('endscene');
+  };
 
   const handleBgmUrlLoad = async () => {
     if (!bgmUrl) return;
@@ -463,10 +576,13 @@ function MixSection() {
       const buffer = await res.arrayBuffer();
       const filename = extractFilename(rawUrl);
       const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
-      setBgmFile(file); setBgmFromCache(false);
+      setBgmFile(file);
+      setBgmCacheStatus('saving');
       updateConfig({ bgm: file, bgm_filename: filename, bgm_url: rawUrl });
-      clearFileFromCache('bgm');
-    } catch { setBgmUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）'); }
+      saveFileToCache('bgm', file)
+        .then(() => setBgmCacheStatus('saved'))
+        .catch(() => setBgmCacheStatus('error'));
+    } catch { setBgmUrlError(t('config.mix.urlError')); }
     finally { setBgmUrlLoading(false); }
   };
   const handleEndsceneUrlLoad = async () => {
@@ -480,10 +596,13 @@ function MixSection() {
       const buffer = await res.arrayBuffer();
       const filename = extractFilename(rawUrl);
       const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
-      setEndsceneFile(file); setEndsceneFromCache(false);
+      setEndsceneFile(file);
+      setEndsceneCacheStatus('saving');
       updateConfig({ endscene: file, endscene_filename: filename, endscene_url: rawUrl });
-      clearFileFromCache('endscene');
-    } catch { setEndsceneUrlError('URLの読み込みに失敗しました（Google DriveはCORS非対応。GitHub Raw / S3推奨）'); }
+      saveFileToCache('endscene', file)
+        .then(() => setEndsceneCacheStatus('saved'))
+        .catch(() => setEndsceneCacheStatus('error'));
+    } catch { setEndsceneUrlError(t('config.mix.urlError')); }
     finally { setEndsceneUrlLoading(false); }
   };
 
@@ -495,50 +614,46 @@ function MixSection() {
             <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
           </svg>
         }
-        title="BGM / エンディング"
-        desc="バックグラウンドミュージックと末尾クリップの合成"
+        title={t('config.mix.title')}
+        desc={t('config.mix.desc')}
       />
 
       {/* BGM */}
       <div className="tg-grp">
-        <GrpHeader>BGMファイル</GrpHeader>
+        <GrpHeader>{t('config.mix.bgmFile')}</GrpHeader>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!cacheLoading && !bgmFile && config.bgm_filename && (
-            <Notice variant="warn">前回: {config.bgm_filename}（再選択が必要です）</Notice>
+            <Notice variant="warn">{tf('fileCacheStatus.previousFile', { name: config.bgm_filename })}</Notice>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ cursor: 'pointer' }}>
-              <span className="tg-btn" style={{ display: 'inline-flex' }}>ファイルを選択</span>
-              <input type="file" accept="audio/*" onChange={handleBgmChange} style={{ display: 'none' }} />
-            </label>
-            {(bgmFile || config.bgm_filename) && (
-              <button onClick={handleClearBgm} style={{ fontSize: 12, color: 'var(--tg-red)', cursor: 'pointer', background: 'none', border: 'none' }}>クリア</button>
-            )}
-          </div>
+          {bgmFile ? (
+            <FileStatus file={bgmFile} cacheStatus={bgmCacheStatus} url={config.bgm_url} onClear={handleClearBgm} />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ cursor: 'pointer' }}>
+                <span className="tg-btn" style={{ display: 'inline-flex' }}>{t('config.mix.selectFile')}</span>
+                <input type="file" accept="audio/*" onChange={handleBgmChange} style={{ display: 'none' }} />
+              </label>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               type="url" value={bgmUrl}
               onChange={e => setBgmUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleBgmUrlLoad()}
-              placeholder="https://... (GitHub Raw, S3等)"
+              placeholder={t('config.mix.urlPlaceholder')}
               className="tg-input"
             />
             <button onClick={handleBgmUrlLoad} disabled={bgmUrlLoading || !bgmUrl} className="tg-btn" style={{ flexShrink: 0 }}>
-              {bgmUrlLoading ? '読込中...' : 'URLから読込'}
+              {bgmUrlLoading ? t('config.mix.loading') : t('config.mix.loadFromUrl')}
             </button>
           </div>
           {bgmUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{bgmUrlError}</span>}
-          {bgmFile && (
-            <Notice variant="success">
-              {bgmFromCache ? `復元: ${bgmFile.name}${config.bgm_url ? ' (URL)' : ' (キャッシュ)'}` : `選択中: ${bgmFile.name}`}
-            </Notice>
-          )}
         </div>
         {bgmFile && (
           <>
             <Row
-              label="BGM音量"
-              hint="絶対音量（推奨: -44 LUFS）"
+              label={t('config.mix.bgmVolume')}
+              hint={t('config.mix.bgmVolumeHint')}
               right={
                 <SliderRow id="bgm-volume" min={-60} max={-20} step={1}
                   value={config.bgm_target_lufs}
@@ -548,22 +663,22 @@ function MixSection() {
               }
             />
             <Row
-              label="フェードイン"
+              label={t('config.mix.fadeIn')}
               right={
                 <SliderRow id="bgm-fade-in" min={0} max={10} step={0.5}
                   value={config.bgm_fade_in}
                   onChange={v => updateConfig({ bgm_fade_in: v })}
-                  valueLabel={`${config.bgm_fade_in.toFixed(1)} 秒`}
+                  valueLabel={`${config.bgm_fade_in.toFixed(1)} ${t('common.seconds')}`}
                 />
               }
             />
             <Row
-              label="フェードアウト"
+              label={t('config.mix.fadeOut')}
               right={
                 <SliderRow id="bgm-fade-out" min={0} max={10} step={0.5}
                   value={config.bgm_fade_out}
                   onChange={v => updateConfig({ bgm_fade_out: v })}
-                  valueLabel={`${config.bgm_fade_out.toFixed(1)} 秒`}
+                  valueLabel={`${config.bgm_fade_out.toFixed(1)} ${t('common.seconds')}`}
                 />
               }
             />
@@ -573,47 +688,43 @@ function MixSection() {
 
       {/* Endscene */}
       <div className="tg-grp">
-        <GrpHeader>エンドシーンファイル</GrpHeader>
+        <GrpHeader>{t('config.mix.endsceneFile')}</GrpHeader>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!cacheLoading && !endsceneFile && config.endscene_filename && (
-            <Notice variant="warn">前回: {config.endscene_filename}（再選択が必要です）</Notice>
+            <Notice variant="warn">{tf('fileCacheStatus.previousFile', { name: config.endscene_filename })}</Notice>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ cursor: 'pointer' }}>
-              <span className="tg-btn" style={{ display: 'inline-flex' }}>ファイルを選択</span>
-              <input type="file" accept="audio/*" onChange={handleEndsceneChange} style={{ display: 'none' }} />
-            </label>
-            {(endsceneFile || config.endscene_filename) && (
-              <button onClick={handleClearEndscene} style={{ fontSize: 12, color: 'var(--tg-red)', cursor: 'pointer', background: 'none', border: 'none' }}>クリア</button>
-            )}
-          </div>
+          {endsceneFile ? (
+            <FileStatus file={endsceneFile} cacheStatus={endsceneCacheStatus} url={config.endscene_url} onClear={handleClearEndscene} />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ cursor: 'pointer' }}>
+                <span className="tg-btn" style={{ display: 'inline-flex' }}>{t('config.mix.selectFile')}</span>
+                <input type="file" accept="audio/*" onChange={handleEndsceneChange} style={{ display: 'none' }} />
+              </label>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               type="url" value={endsceneUrl}
               onChange={e => setEndsceneUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleEndsceneUrlLoad()}
-              placeholder="https://... (GitHub Raw, S3等)"
+              placeholder={t('config.mix.urlPlaceholder')}
               className="tg-input"
             />
             <button onClick={handleEndsceneUrlLoad} disabled={endsceneUrlLoading || !endsceneUrl} className="tg-btn" style={{ flexShrink: 0 }}>
-              {endsceneUrlLoading ? '読込中...' : 'URLから読込'}
+              {endsceneUrlLoading ? t('config.mix.loading') : t('config.mix.loadFromUrl')}
             </button>
           </div>
           {endsceneUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{endsceneUrlError}</span>}
-          {endsceneFile && (
-            <Notice variant="success">
-              {endsceneFromCache ? `復元: ${endsceneFile.name}${config.endscene_url ? ' (URL)' : ' (キャッシュ)'}` : `選択中: ${endsceneFile.name}`}
-            </Notice>
-          )}
         </div>
         {endsceneFile && (
           <Row
-            label="クロスフェード"
+            label={t('config.mix.crossfade')}
             right={
               <SliderRow id="endscene-crossfade" min={0} max={5} step={0.5}
                 value={config.endscene_crossfade}
                 onChange={v => updateConfig({ endscene_crossfade: v })}
-                valueLabel={`${config.endscene_crossfade.toFixed(1)} 秒`}
+                valueLabel={`${config.endscene_crossfade.toFixed(1)} ${t('common.seconds')}`}
               />
             }
           />
@@ -625,6 +736,7 @@ function MixSection() {
 
 function ExportSection() {
   const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <StageHeader
@@ -633,13 +745,13 @@ function ExportSection() {
             <path d="M12 3v13M5 10l7 7 7-7"/><path d="M4 20h16"/>
           </svg>
         }
-        title="エクスポート"
-        desc="出力フォーマットとビットレートの設定"
+        title={t('config.export.title')}
+        desc={t('config.export.desc')}
       />
       <div className="tg-grp">
-        <GrpHeader>フォーマット</GrpHeader>
+        <GrpHeader>{t('config.export.format')}</GrpHeader>
         <Row
-          label="出力形式"
+          label={t('config.export.outputFormat')}
           right={
             <div className="tg-seg">
               {(['mp3', 'wav'] as const).map(fmt => (
@@ -656,7 +768,7 @@ function ExportSection() {
         />
         {config.output_format === 'mp3' && (
           <Row
-            label="ビットレート"
+            label={t('config.export.bitrate')}
             right={
               <div className="tg-seg">
                 {(['128k', '192k', '256k', '320k'] as const).map(br => (
@@ -673,7 +785,7 @@ function ExportSection() {
           />
         )}
       </div>
-      <Notice>192kbps はポッドキャストの標準ビットレートです。配信プラットフォームが圧縮するため、320kbps の効果は限定的です。</Notice>
+      <Notice>{t('config.export.bitrateNotice')}</Notice>
     </div>
   );
 }

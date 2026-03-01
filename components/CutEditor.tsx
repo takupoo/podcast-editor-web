@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n';
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -57,6 +58,7 @@ const TICK_CANDIDATES = [1, 2, 5, 10, 15, 30, 60, 120, 300];
 
 export function CutEditor() {
   const { files, config, addCutRegion, removeCutRegion, clearCutRegions } = useAppStore();
+  const { t } = useTranslation();
 
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
@@ -260,8 +262,8 @@ export function CutEditor() {
   };
 
   const handleTimeInputBlur = () => {
-    const t = parseTime(timeInput);
-    if (t !== null) seekTo(t);
+    const parsed = parseTime(timeInput);
+    if (parsed !== null) seekTo(parsed);
     else setTimeInput(formatTime(currentTime));
   };
 
@@ -285,7 +287,7 @@ export function CutEditor() {
       r => start < r.endTime && end > r.startTime,
     );
     if (overlapping) {
-      alert('既存のカット区間と重複しています');
+      alert(t('cutEditor.overlapAlert'));
       return;
     }
     addCutRegion({ startTime: start, endTime: end });
@@ -309,14 +311,14 @@ export function CutEditor() {
     return (
       <div className="p-6 flex flex-col gap-4">
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>手動カット</h2>
-          <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>2つの音声ファイルをアップロードしてください</p>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('cutEditor.title')}</h2>
+          <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('cutEditor.needFiles')}</p>
         </div>
         <div className="tg-notice warn">
           <svg style={{ width: 14, height: 14, color: 'var(--tg-orange)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>
           </svg>
-          <span>「音声ファイル」セクションで話者A・Bの2ファイルをアップロードしてください。</span>
+          <span>{t('cutEditor.needFilesDesc')}</span>
         </div>
       </div>
     );
@@ -339,8 +341,8 @@ export function CutEditor() {
           </svg>
         </div>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>手動カット</div>
-          <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>再生しながら不要な区間をマークしてカット</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('cutEditor.title')}</div>
+          <div style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('cutEditor.desc')}</div>
         </div>
         {config.cut_regions.length > 0 && (
           <span style={{
@@ -351,7 +353,7 @@ export function CutEditor() {
             color: 'var(--tg-red)',
             border: '1px solid rgba(255,59,48,0.2)',
           }}>
-            {config.cut_regions.length} 区間
+            {config.cut_regions.length}
           </span>
         )}
       </div>
@@ -371,8 +373,8 @@ export function CutEditor() {
             <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
           </svg>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>音声を同期中...</div>
-            <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>クラップ音を検出して2トラックを同期しています</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>{t('cutEditor.syncing')}</div>
+            <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>{t('cutEditor.syncingDesc')}</div>
           </div>
         </div>
       )}
@@ -387,7 +389,7 @@ export function CutEditor() {
           textTransform: 'uppercase',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-          タイムライン
+          {t('cutEditor.timeline')}
         </div>
 
         {/* Toolbar */}
@@ -458,7 +460,7 @@ export function CutEditor() {
               className="tg-btn"
               onClick={() => setPps(fitPps)}
               style={{ fontSize: 10, padding: '4px 8px' }}
-            >全体</button>
+            >{t('cutEditor.fitAll')}</button>
           </div>
         </div>
 
@@ -475,7 +477,7 @@ export function CutEditor() {
               disabled={!audioUrlA || !duration}
               style={{ background: 'rgba(255,159,10,0.12)', borderColor: 'rgba(255,159,10,0.25)', fontSize: 11, padding: '3px 10px' }}
             >
-              ここから
+              {t('cutEditor.markFrom')}
             </button>
           ) : (
             <>
@@ -484,13 +486,13 @@ export function CutEditor() {
                 onClick={handleMarkOut}
                 style={{ background: 'rgba(255,59,48,0.12)', borderColor: 'rgba(255,59,48,0.25)', fontSize: 11, padding: '3px 10px' }}
               >
-                ここまで
+                {t('cutEditor.markTo')}
               </button>
               <button className="tg-btn" onClick={handleCancelMark} style={{ fontSize: 11, padding: '3px 10px' }}>
-                キャンセル
+                {t('cutEditor.cancel')}
               </button>
               <span style={{ fontSize: 11, color: 'var(--tg-orange)' }}>
-                開始: {formatTime(markIn)}
+                {t('cutEditor.startAt')} {formatTime(markIn)}
               </span>
             </>
           )}
@@ -631,7 +633,7 @@ export function CutEditor() {
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span>カット区間</span>
+          <span>{t('cutEditor.cutRegions')}</span>
           {config.cut_regions.length > 0 && (
             <button
               onClick={clearCutRegions}
@@ -641,14 +643,14 @@ export function CutEditor() {
                 letterSpacing: 'normal', fontWeight: 400,
               }}
             >
-              全て削除
+              {t('cutEditor.deleteAll')}
             </button>
           )}
         </div>
         <div style={{ padding: '8px 16px' }}>
           {config.cut_regions.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--tg-t3)', padding: '8px 0' }}>
-              カット区間なし。再生しながら「ここから」→「ここまで」でマークしてください。
+              {t('cutEditor.noCutRegions')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -670,7 +672,7 @@ export function CutEditor() {
                     {formatTime(region.startTime)} — {formatTime(region.endTime)}
                   </span>
                   <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>
-                    ({(region.endTime - region.startTime).toFixed(1)}秒)
+                    ({(region.endTime - region.startTime).toFixed(1)}{t('cutEditor.seconds')})
                   </span>
                   <button
                     onClick={() => seekTo(region.startTime)}
@@ -680,7 +682,7 @@ export function CutEditor() {
                       background: 'none', border: 'none',
                     }}
                   >
-                    再生
+                    {t('cutEditor.play')}
                   </button>
                   <button
                     onClick={() => removeCutRegion(region.id)}
@@ -689,7 +691,7 @@ export function CutEditor() {
                       background: 'none', border: 'none',
                     }}
                   >
-                    削除
+                    {t('cutEditor.delete')}
                   </button>
                 </div>
               ))}
@@ -703,7 +705,7 @@ export function CutEditor() {
         <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/>
         </svg>
-        <span>クラップ音で自動同期済みの音声を表示しています。カット区間は両トラックに同時に適用されます。スペースキーで再生/停止。</span>
+        <span>{t('cutEditor.syncNotice')}</span>
       </div>
     </div>
   );
