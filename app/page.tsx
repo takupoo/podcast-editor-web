@@ -78,6 +78,171 @@ function NavIcon({ id }: { id: SectionId }) {
   }
 }
 
+// ── How to use modal ──────────────────────────────────────────
+function HowToUseModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  const steps = [
+    {
+      num: '1',
+      title: '音声ファイルをアップロード',
+      desc: '話者A・Bの音声ファイル（MP3 / WAV / M4A）を2つドラッグ＆ドロップ、またはクリックして選択します。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>,
+    },
+    {
+      num: '2',
+      title: '同期（クラップ検出）',
+      desc: '収録開始時の手拍子（クラップ）を自動検出し、2つの音声トラックの開始位置を揃えます。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>,
+    },
+    {
+      num: '3',
+      title: '手動カット（任意）',
+      desc: 'タイムライン上で不要な部分をマークして削除できます。再生しながらイン／アウト点を設定します。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>,
+    },
+    {
+      num: '4',
+      title: '音声加工',
+      desc: 'ノイズ除去、ラウドネス正規化（-16 LUFS）、ダイナミクス処理（コンプレッサー＋リミッター）を設定します。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>,
+    },
+    {
+      num: '5',
+      title: '無音カット・BGM追加（任意）',
+      desc: '長い無音部分を自動で短縮したり、BGMやエンディング音声をミックスできます。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>,
+    },
+    {
+      num: '6',
+      title: '処理実行 & ダウンロード',
+      desc: '「処理実行」ボタンをクリックすると、すべての処理がブラウザ内で実行されます。完了後、結果をダウンロードできます。',
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>,
+    },
+  ];
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 520,
+          maxHeight: 'calc(100dvh - 80px)',
+          margin: '0 20px',
+          background: 'rgba(28, 28, 36, 0.95)',
+          backdropFilter: 'blur(40px) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(40px) saturate(1.8)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 18,
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 24px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>
+              使い方ガイド
+            </h2>
+            <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 3 }}>
+              Spectratrek でポッドキャストを編集する手順
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 28, height: 28, borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              color: 'var(--tg-t2)', cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+          >
+            <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M4 4l8 8M12 4l-8 8"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Steps */}
+        <div style={{ overflowY: 'auto', padding: '16px 24px 24px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {steps.map((step, i) => (
+              <div
+                key={step.num}
+                style={{
+                  display: 'flex', gap: 14, padding: '14px 0',
+                  borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(10,132,255,0.12)',
+                  border: '1px solid rgba(10,132,255,0.2)',
+                  color: 'var(--tg-accent)',
+                }}>
+                  {step.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: 'var(--tg-accent)',
+                      background: 'rgba(10,132,255,0.15)',
+                      borderRadius: 6, padding: '1px 7px',
+                      lineHeight: '18px',
+                    }}>
+                      STEP {step.num}
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>
+                      {step.title}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 5, lineHeight: 1.6 }}>
+                    {step.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tips */}
+          <div style={{ marginTop: 16 }} className="tg-notice">
+            <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontWeight: 600, color: 'var(--tg-t1)', fontSize: 12 }}>Tips</span>
+              <span>まず「プレビュー」モードで短い時間だけ試聴してから、「フル処理」で本番実行するのがおすすめです。</span>
+              <span>すべての処理はブラウザ内で完結するため、音声データがサーバーに送信されることはありません。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────
 export default function Home() {
   const { config, files, setFiles, removeFile, resetConfig } = useAppStore();
@@ -88,6 +253,7 @@ export default function Home() {
   const [result, setResult]         = useState<Blob | null>(null);
 
   const [notifPerm, setNotifPerm]   = useState<NotificationPermission>('default');
+  const [showHelp, setShowHelp]     = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -236,6 +402,30 @@ export default function Home() {
           }}>
             Spectratrek
           </div>
+          <button
+            onClick={() => setShowHelp(true)}
+            style={{
+              width: 26, height: 26, borderRadius: 8, marginLeft: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              color: 'var(--tg-t2)', cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.14)';
+              e.currentTarget.style.color = 'var(--tg-t1)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+              e.currentTarget.style.color = 'var(--tg-t2)';
+            }}
+            title="使い方ガイド"
+          >
+            <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zm-.5-2h1v1h-1v-1zm.5-7a2.5 2.5 0 0 0-2.5 2.5h1.2A1.3 1.3 0 0 1 8 5.7c.7 0 1.3.6 1.3 1.3 0 .5-.3.9-.7 1.1-.6.3-1.1 1-1.1 1.7v.2h1.2v-.2c0-.4.2-.7.6-.9.7-.4 1.2-1.1 1.2-1.9A2.5 2.5 0 0 0 8 4.5z"/>
+            </svg>
+          </button>
         </div>
 
         {/* ── Toolbar ───────────────────────────────────────── */}
@@ -468,6 +658,9 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Help modal */}
+      {showHelp && <HowToUseModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
