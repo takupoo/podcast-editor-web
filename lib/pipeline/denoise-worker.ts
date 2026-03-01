@@ -69,10 +69,33 @@ function spectralSubtractChannels(
 ): Float32Array[] {
   const FFT_SIZE = 2048;
   const HOP = FFT_SIZE >> 2;
+  const HALF = (FFT_SIZE >> 1) + 1;
+
+  // スペクトルフロア: 元の振幅の6%を最低保証（ミュージカルノイズ防止）
+  const SPECTRAL_FLOOR = 0.06;
+
+  // テンポラルスムージング係数
+  // 新フレームのゲインを30%、前フレームを70%でブレンド → ゲインの急変を防止
+  const GAIN_SMOOTH_ALPHA = 0.3;
 
   const hann = new Float32Array(FFT_SIZE);
   for (let i = 0; i < FFT_SIZE; i++) {
     hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (FFT_SIZE - 1)));
+  }
+
+  // 周波数帯域別の感度スケーリングを事前計算
+  // 3kHz以上で感度を下げ、高い声の倍音を過剰に除去しない
+  const sensitivityScale = new Float32Array(HALF);
+  for (let i = 0; i < HALF; i++) {
+    const freq = (i * sampleRate) / FFT_SIZE;
+    if (freq <= 3000) {
+      sensitivityScale[i] = 1.0;
+    } else if (freq <= 8000) {
+      // 3kHz→8kHz で 1.0→0.5 にリニアに減衰
+      sensitivityScale[i] = 1.0 - 0.5 * ((freq - 3000) / 5000);
+    } else {
+      sensitivityScale[i] = 0.5;
+    }
   }
 
   const outputChannels: Float32Array[] = [];
@@ -100,7 +123,6 @@ function spectralSubtractChannels(
     const noiseThreshold = sorted[Math.max(10, Math.floor(totalFrames * 0.1)) - 1];
 
     // パス1.5: ノイズフレームから平均マグニチュードスペクトル
-    const HALF = (FFT_SIZE >> 1) + 1;
     const noiseSpec = new Float32Array(HALF);
     let noiseCount = 0;
     const re = new Float32Array(FFT_SIZE);
@@ -141,7 +163,11 @@ function spectralSubtractChannels(
       for (let i = 0; i < HALF; i++) noiseSpec[i] /= noiseCount;
     }
 
-    // パス2: スペクトル減算
+    // テンポラルスムージング用: 前フレームのゲインバッファ
+    const prevGain = new Float32Array(HALF);
+    prevGain.fill(1.0);
+
+    // パス2: ウィーナーフィルター + 周波数帯域別感度 + テンポラルスムージング
     for (let f = 0; f < totalFrames; f++) {
       const off = f * HOP;
       for (let i = 0; i < FFT_SIZE; i++) {
@@ -153,7 +179,18 @@ function spectralSubtractChannels(
       for (let i = 0; i < HALF; i++) {
         const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
         const phase = Math.atan2(im[i], re[i]);
-        const cleanMag = Math.max(mag - sensitivity * noiseSpec[i], 0.01 * mag);
+
+        // ウィーナーフィルター: gain = max(1 - (noise/signal)², floor)
+        // 単純なスペクトル減算 (mag - noise) より自然な減衰特性
+        const scaledNoise = sensitivity * sensitivityScale[i] * noiseSpec[i];
+        const noiseRatio = mag > 1e-10 ? scaledNoise / mag : 1.0;
+        const wienerGain = Math.max(1.0 - noiseRatio * noiseRatio, SPECTRAL_FLOOR);
+
+        // テンポラルスムージング: 前フレームのゲインとブレンドしてゲイン急変を防止
+        const smoothedGain = GAIN_SMOOTH_ALPHA * wienerGain + (1 - GAIN_SMOOTH_ALPHA) * prevGain[i];
+        prevGain[i] = smoothedGain;
+
+        const cleanMag = smoothedGain * mag;
         re[i] = cleanMag * Math.cos(phase);
         im[i] = cleanMag * Math.sin(phase);
       }

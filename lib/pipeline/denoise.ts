@@ -22,7 +22,7 @@ export async function applyDenoise(
 
   if (method === 'none') {
     // 方式1: ノイズ除去なし（ハイ/ローパスフィルタのみ）
-    const basicFilter = ['highpass=f=80', 'lowpass=f=12000'].join(',');
+    const basicFilter = ['highpass=f=80', 'lowpass=f=16000'].join(',');
     await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
     console.log('[Denoise] 基本フィルタによる処理完了');
     return;
@@ -38,7 +38,7 @@ export async function applyDenoise(
     const filter = [
       'highpass=f=80',
       `afftdn=nr=${nr}:nf=-25:tn=1`,
-      'lowpass=f=12000',
+      'lowpass=f=16000',
     ].join(',');
 
     try {
@@ -46,7 +46,7 @@ export async function applyDenoise(
       console.log('[Denoise] afftdn完了');
     } catch (error) {
       console.warn('[Denoise] afftdn失敗、フォールバック:', error);
-      const basicFilter = ['highpass=f=80', 'lowpass=f=12000'].join(',');
+      const basicFilter = ['highpass=f=80', 'lowpass=f=16000'].join(',');
       await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
     }
     return;
@@ -60,7 +60,7 @@ export async function applyDenoise(
     const filter = [
       'highpass=f=80',
       `anlmdn=s=${strength}:p=7:r=15`,
-      'lowpass=f=12000',
+      'lowpass=f=16000',
     ].join(',');
 
     try {
@@ -68,7 +68,7 @@ export async function applyDenoise(
       console.log('[Denoise] anlmdn完了');
     } catch (error) {
       console.warn('[Denoise] anlmdn失敗、フォールバック:', error);
-      const basicFilter = ['highpass=f=80', 'lowpass=f=12000'].join(',');
+      const basicFilter = ['highpass=f=80', 'lowpass=f=16000'].join(',');
       await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
     }
     return;
