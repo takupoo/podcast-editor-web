@@ -92,42 +92,47 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const steps = [
+  const mainSteps = [
     {
       num: '1',
-      title: t('howToUse.step1Title'),
-      desc: t('howToUse.step1Desc'),
+      title: t('howToUse.mainStep1Title'),
+      desc: t('howToUse.mainStep1Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>,
     },
     {
       num: '2',
-      title: t('howToUse.step2Title'),
-      desc: t('howToUse.step2Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>,
-    },
-    {
-      num: '3',
-      title: t('howToUse.step3Title'),
-      desc: t('howToUse.step3Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>,
-    },
-    {
-      num: '4',
-      title: t('howToUse.step4Title'),
-      desc: t('howToUse.step4Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>,
-    },
-    {
-      num: '5',
-      title: t('howToUse.step5Title'),
-      desc: t('howToUse.step5Desc'),
+      title: t('howToUse.mainStep2Title'),
+      desc: t('howToUse.mainStep2Desc'),
       icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>,
     },
     {
-      num: '6',
-      title: t('howToUse.step6Title'),
-      desc: t('howToUse.step6Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>,
+      num: '3',
+      title: t('howToUse.mainStep3Title'),
+      desc: t('howToUse.mainStep3Desc'),
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>,
+    },
+  ];
+
+  const options = [
+    {
+      title: t('howToUse.option1Title'),
+      desc: t('howToUse.option1Desc'),
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>,
+    },
+    {
+      title: t('howToUse.option2Title'),
+      desc: t('howToUse.option2Desc'),
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>,
+    },
+    {
+      title: t('howToUse.option3Title'),
+      desc: t('howToUse.option3Desc'),
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2"/></svg>,
+    },
+    {
+      title: t('howToUse.option4Title'),
+      desc: t('howToUse.option4Desc'),
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8a6 6 0 1 1 12 0A6 6 0 0 1 2 8z"/><path d="M8 5v3l2 1.5"/></svg>,
     },
   ];
 
@@ -190,56 +195,157 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Steps */}
+        {/* Body */}
         <div style={{ overflowY: 'auto', padding: '16px 24px 24px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {steps.map((step, i) => (
+
+          {/* ── Main flow section ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: 'var(--tg-green)',
+              background: 'rgba(48,209,88,0.15)',
+              borderRadius: 6, padding: '2px 9px',
+              letterSpacing: '0.5px',
+            }}>
+              {t('howToUse.mainFlowLabel')}
+            </span>
+          </div>
+
+          {/* Main steps with connector line */}
+          <div style={{ position: 'relative', paddingLeft: 18 }}>
+            {/* Vertical connector line */}
+            <div style={{
+              position: 'absolute', left: 17, top: 18, bottom: 18,
+              width: 2, background: 'rgba(48,209,88,0.25)',
+              borderRadius: 1,
+            }} />
+
+            {mainSteps.map((step, i) => (
               <div
                 key={step.num}
                 style={{
-                  display: 'flex', gap: 14, padding: '14px 0',
-                  borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  display: 'flex', gap: 16, padding: '12px 0',
+                  position: 'relative',
                 }}
               >
+                {/* Step number circle on the line */}
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(10,132,255,0.12)',
-                  border: '1px solid rgba(10,132,255,0.2)',
-                  color: 'var(--tg-accent)',
+                  background: 'rgba(48,209,88,0.15)',
+                  border: '2px solid rgba(48,209,88,0.4)',
+                  color: 'var(--tg-green)',
+                  fontSize: 14, fontWeight: 700,
+                  position: 'relative', zIndex: 1,
                 }}>
                   {step.icon}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{
-                      fontSize: 11, fontWeight: 700, color: 'var(--tg-accent)',
-                      background: 'rgba(10,132,255,0.15)',
-                      borderRadius: 6, padding: '1px 7px',
-                      lineHeight: '18px',
+                      fontSize: 11, fontWeight: 700, color: 'var(--tg-green)',
+                      opacity: 0.7,
                     }}>
-                      STEP {step.num}
+                      {step.num}
                     </span>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>
                       {step.title}
                     </span>
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 5, lineHeight: 1.6 }}>
+                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 4, lineHeight: 1.6 }}>
                     {step.desc}
                   </p>
+                  {/* Arrow connector between steps */}
+                  {i < mainSteps.length - 1 && (
+                    <div style={{
+                      marginTop: 8,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      color: 'var(--tg-t3)', fontSize: 11,
+                    }}>
+                      <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        <path d="M8 3v10M4 9l4 4 4-4"/>
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Tips */}
-          <div style={{ marginTop: 16 }} className="tg-notice">
-            <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontWeight: 600, color: 'var(--tg-t1)', fontSize: 12 }}>{t('howToUse.tips')}</span>
-              <span>{t('howToUse.tip1')}</span>
-              <span>{t('howToUse.tip2')}</span>
-            </div>
+          {/* ── Divider ── */}
+          <div style={{
+            height: 1, background: 'rgba(255,255,255,0.06)',
+            margin: '16px 0',
+          }} />
+
+          {/* ── Options section ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: 'var(--tg-t2)',
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: 6, padding: '2px 9px',
+              letterSpacing: '0.5px',
+            }}>
+              {t('howToUse.optionsLabel')}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>
+              {t('howToUse.optionsDesc')}
+            </span>
+          </div>
+
+          {/* Option cards - 2x2 grid */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+          }}>
+            {options.map((opt) => (
+              <div
+                key={opt.title}
+                style={{
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 12,
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6,
+                }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: 'var(--tg-t2)',
+                  }}>
+                    {opt.icon}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tg-t1)' }}>
+                    {opt.title}
+                  </span>
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--tg-t3)', lineHeight: 1.55 }}>
+                  {opt.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Privacy note */}
+          <div style={{
+            marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 13px',
+            background: 'rgba(48,209,88,0.06)',
+            border: '1px solid rgba(48,209,88,0.15)',
+            borderRadius: 10,
+            fontSize: 11, color: 'var(--tg-t2)', lineHeight: 1.5,
+          }}>
+            <svg style={{ width: 14, height: 14, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5zM8 9a1 1 0 0 1 .5 1.87V12.5h-1v-1.63A1 1 0 0 1 8 9z"/>
+            </svg>
+            <span>{t('howToUse.privacyNote')}</span>
           </div>
         </div>
       </div>
