@@ -3,8 +3,9 @@
 import { useAppStore } from '@/lib/store';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { LevelSelector } from '@/components/LevelSelector';
 import { useState, useEffect } from 'react';
-import { saveFileToCache, loadFileFromCache, clearFileFromCache, checkFileInCache } from '@/lib/file-cache';
+import { saveFileToCache, loadFileFromCache, clearFileFromCache } from '@/lib/file-cache';
 import { useTranslation } from '@/lib/i18n';
 
 export type ConfigSection = 'trim' | 'processing' | 'silence' | 'mix' | 'export';
@@ -103,6 +104,15 @@ function Notice({ children, variant = 'info' }: { children: React.ReactNode; var
   );
 }
 
+function SettingsBanner() {
+  const { t } = useTranslation();
+  return (
+    <Notice>
+      {t('config.settingsBanner')}
+    </Notice>
+  );
+}
+
 function StageHeader({ icon, title, desc, enabledKey }: {
   icon: React.ReactNode;
   title: string;
@@ -194,7 +204,7 @@ function FileStatus({ file, cacheStatus, url, onClear }: {
 // ── Section panels ─────────────────────────────────────────────
 
 function TrimSection() {
-  const { config, updateConfig } = useAppStore();
+  const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
@@ -209,54 +219,70 @@ function TrimSection() {
         title={t('config.trim.title')}
         desc={t('config.trim.desc')}
       />
+      <SettingsBanner />
       <div className="tg-grp" style={{ background: 'linear-gradient(145deg,rgba(255,159,10,0.06),transparent)' }}>
         <GrpHeader>{t('config.trim.detection')}</GrpHeader>
-        <Row
-          label={t('config.trim.clapThreshold')}
-          hint={t('config.trim.clapThresholdHint')}
-          right={
-            <SliderRow
-              id="clap-threshold" min={-20} max={-5} step={1}
-              value={config.clap_threshold_db}
-              onChange={v => updateConfig({ clap_threshold_db: v })}
-              valueLabel={`${config.clap_threshold_db} dB`}
-            />
-          }
-        />
+        {advancedMode ? (
+          <Row
+            label={t('config.trim.clapThreshold')}
+            hint={t('config.trim.clapThresholdHint')}
+            right={
+              <SliderRow
+                id="clap-threshold" min={-20} max={-5} step={1}
+                value={config.clap_threshold_db}
+                onChange={v => updateConfig({ clap_threshold_db: v })}
+                valueLabel={`${config.clap_threshold_db} dB`}
+              />
+            }
+          />
+        ) : (
+          <Row
+            label={t('config.trim.clapThreshold')}
+            right={
+              <LevelSelector
+                configKey="clap_threshold_db"
+                value={config.clap_threshold_db}
+                onChange={v => updateConfig({ clap_threshold_db: v })}
+              />
+            }
+          />
+        )}
       </div>
-      <div className="tg-grp">
-        <GrpHeader>{t('config.trim.margin')}</GrpHeader>
-        <Row
-          label={t('config.trim.preClap')}
-          hint={t('config.trim.preClapHint')}
-          right={
-            <SliderRow
-              id="pre-clap-margin" min={0} max={3} step={0.1}
-              value={config.pre_clap_margin}
-              onChange={v => updateConfig({ pre_clap_margin: v })}
-              valueLabel={`${config.pre_clap_margin.toFixed(1)} ${t('common.seconds')}`}
-            />
-          }
-        />
-        <Row
-          label={t('config.trim.postClap')}
-          hint={t('config.trim.postClapHint')}
-          right={
-            <SliderRow
-              id="post-clap-cut" min={0} max={2} step={0.1}
-              value={config.post_clap_cut}
-              onChange={v => updateConfig({ post_clap_cut: v })}
-              valueLabel={`${config.post_clap_cut.toFixed(1)} ${t('common.seconds')}`}
-            />
-          }
-        />
-      </div>
+      {advancedMode && (
+        <div className="tg-grp">
+          <GrpHeader>{t('config.trim.margin')}</GrpHeader>
+          <Row
+            label={t('config.trim.preClap')}
+            hint={t('config.trim.preClapHint')}
+            right={
+              <SliderRow
+                id="pre-clap-margin" min={0} max={3} step={0.1}
+                value={config.pre_clap_margin}
+                onChange={v => updateConfig({ pre_clap_margin: v })}
+                valueLabel={`${config.pre_clap_margin.toFixed(1)} ${t('common.seconds')}`}
+              />
+            }
+          />
+          <Row
+            label={t('config.trim.postClap')}
+            hint={t('config.trim.postClapHint')}
+            right={
+              <SliderRow
+                id="post-clap-cut" min={0} max={2} step={0.1}
+                value={config.post_clap_cut}
+                onChange={v => updateConfig({ post_clap_cut: v })}
+                valueLabel={`${config.post_clap_cut.toFixed(1)} ${t('common.seconds')}`}
+              />
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 function ProcessingSection() {
-  const { config, updateConfig } = useAppStore();
+  const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
@@ -271,135 +297,185 @@ function ProcessingSection() {
         desc={t('config.processing.desc')}
         enabledKey="denoise_enabled"
       />
+      <SettingsBanner />
 
-      {/* Denoise method */}
-      <div className="tg-grp">
-        <GrpHeader>{t('config.processing.denoiseAlgorithm')}</GrpHeader>
-        <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
-            <label
-              key={method}
-              style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10,
-                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                background: config.denoise_method === method ? 'rgba(10,132,255,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${config.denoise_method === method ? 'rgba(10,132,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
-                transition: 'all 0.14s',
-              }}
-            >
-              <input
-                type="radio"
-                name="denoise_method"
-                value={method}
-                checked={config.denoise_method === method}
-                onChange={() => updateConfig({ denoise_method: method })}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>
-                  {method === 'spectral' && t('config.processing.spectral')}
-                  {method === 'afftdn' && t('config.processing.afftdn')}
-                  {method === 'anlmdn' && t('config.processing.anlmdn')}
-                  {method === 'none' && t('config.processing.none')}
+      {/* Denoise method — advanced only */}
+      {advancedMode && (
+        <div className="tg-grp">
+          <GrpHeader>{t('config.processing.denoiseAlgorithm')}</GrpHeader>
+          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
+              <label
+                key={method}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  background: config.denoise_method === method ? 'rgba(10,132,255,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${config.denoise_method === method ? 'rgba(10,132,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                  transition: 'all 0.14s',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="denoise_method"
+                  value={method}
+                  checked={config.denoise_method === method}
+                  onChange={() => updateConfig({ denoise_method: method })}
+                  style={{ marginTop: 2 }}
+                />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>
+                    {method === 'spectral' && t('config.processing.spectral')}
+                    {method === 'afftdn' && t('config.processing.afftdn')}
+                    {method === 'anlmdn' && t('config.processing.anlmdn')}
+                    {method === 'none' && t('config.processing.none')}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>
+                    {method === 'spectral' && t('config.processing.spectralDesc')}
+                    {method === 'afftdn' && t('config.processing.afftdnDesc')}
+                    {method === 'anlmdn' && t('config.processing.anlmdnDesc')}
+                    {method === 'none' && t('config.processing.noneDesc')}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>
-                  {method === 'spectral' && t('config.processing.spectralDesc')}
-                  {method === 'afftdn' && t('config.processing.afftdnDesc')}
-                  {method === 'anlmdn' && t('config.processing.anlmdnDesc')}
-                  {method === 'none' && t('config.processing.noneDesc')}
-                </div>
-              </div>
-            </label>
-          ))}
+              </label>
+            ))}
+          </div>
+          {config.denoise_method !== 'none' && (
+            <Row
+              label={t('config.processing.noiseFloor')}
+              hint={t('config.processing.noiseFloorHint')}
+              right={
+                <SliderRow
+                  id="noise-gate-threshold" min={-60} max={-30} step={5}
+                  value={config.noise_gate_threshold}
+                  onChange={v => updateConfig({ noise_gate_threshold: v })}
+                  valueLabel={`${config.noise_gate_threshold} dB`}
+                />
+              }
+            />
+          )}
         </div>
-        {config.denoise_method !== 'none' && (
+      )}
+
+      {/* Noise removal — simple mode */}
+      {!advancedMode && config.denoise_method !== 'none' && (
+        <div className="tg-grp">
+          <GrpHeader>{t('config.processing.noiseFloor')}</GrpHeader>
           <Row
             label={t('config.processing.noiseFloor')}
-            hint={t('config.processing.noiseFloorHint')}
             right={
-              <SliderRow
-                id="noise-gate-threshold" min={-60} max={-30} step={5}
+              <LevelSelector
+                configKey="noise_gate_threshold"
                 value={config.noise_gate_threshold}
                 onChange={v => updateConfig({ noise_gate_threshold: v })}
-                valueLabel={`${config.noise_gate_threshold} dB`}
+              />
+            }
+          />
+        </div>
+      )}
+
+      {/* Loudness */}
+      <div className="tg-grp">
+        <GrpHeader>{t('config.processing.loudness')}</GrpHeader>
+        {advancedMode ? (
+          <>
+            <Row
+              label={t('config.processing.targetLoudness')}
+              hint={t('config.processing.targetLoudnessHint')}
+              right={
+                <SliderRow
+                  id="target-lufs" min={-20} max={-12} step={0.5}
+                  value={config.target_lufs}
+                  onChange={v => updateConfig({ target_lufs: v })}
+                  valueLabel={`${config.target_lufs} LUFS`}
+                />
+              }
+            />
+            <Row
+              label="True Peak"
+              right={
+                <SliderRow
+                  id="true-peak" min={-3} max={0} step={0.5}
+                  value={config.true_peak}
+                  onChange={v => updateConfig({ true_peak: v })}
+                  valueLabel={`${config.true_peak} dBTP`}
+                />
+              }
+            />
+          </>
+        ) : (
+          <Row
+            label={t('config.processing.targetLoudness')}
+            right={
+              <LevelSelector
+                configKey="target_lufs"
+                value={config.target_lufs}
+                onChange={v => updateConfig({ target_lufs: v })}
               />
             }
           />
         )}
       </div>
 
-      {/* Loudness */}
-      <div className="tg-grp">
-        <GrpHeader>{t('config.processing.loudness')}</GrpHeader>
-        <Row
-          label={t('config.processing.targetLoudness')}
-          hint={t('config.processing.targetLoudnessHint')}
-          right={
-            <SliderRow
-              id="target-lufs" min={-20} max={-12} step={0.5}
-              value={config.target_lufs}
-              onChange={v => updateConfig({ target_lufs: v })}
-              valueLabel={`${config.target_lufs} LUFS`}
-            />
-          }
-        />
-        <Row
-          label="True Peak"
-          right={
-            <SliderRow
-              id="true-peak" min={-3} max={0} step={0.5}
-              value={config.true_peak}
-              onChange={v => updateConfig({ true_peak: v })}
-              valueLabel={`${config.true_peak} dBTP`}
-            />
-          }
-        />
-      </div>
-
       {/* Dynamics */}
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.dynamics')}</GrpHeader>
-        <Row
-          label={t('config.processing.ratio')}
-          hint={t('config.processing.ratioHint')}
-          right={
-            <SliderRow
-              id="comp-ratio" min={2} max={10} step={1}
-              value={config.comp_ratio}
-              onChange={v => updateConfig({ comp_ratio: v })}
-              valueLabel={`${config.comp_ratio} : 1`}
+        {advancedMode ? (
+          <>
+            <Row
+              label={t('config.processing.ratio')}
+              hint={t('config.processing.ratioHint')}
+              right={
+                <SliderRow
+                  id="comp-ratio" min={2} max={10} step={1}
+                  value={config.comp_ratio}
+                  onChange={v => updateConfig({ comp_ratio: v })}
+                  valueLabel={`${config.comp_ratio} : 1`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.processing.attack')}
-          right={
-            <SliderRow
-              id="comp-attack" min={1} max={100} step={1}
-              value={config.comp_attack}
-              onChange={v => updateConfig({ comp_attack: v })}
-              valueLabel={`${config.comp_attack} ms`}
+            <Row
+              label={t('config.processing.attack')}
+              right={
+                <SliderRow
+                  id="comp-attack" min={1} max={100} step={1}
+                  value={config.comp_attack}
+                  onChange={v => updateConfig({ comp_attack: v })}
+                  valueLabel={`${config.comp_attack} ms`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.processing.release')}
-          right={
-            <SliderRow
-              id="comp-release" min={10} max={500} step={10}
-              value={config.comp_release}
-              onChange={v => updateConfig({ comp_release: v })}
-              valueLabel={`${config.comp_release} ms`}
+            <Row
+              label={t('config.processing.release')}
+              right={
+                <SliderRow
+                  id="comp-release" min={10} max={500} step={10}
+                  value={config.comp_release}
+                  onChange={v => updateConfig({ comp_release: v })}
+                  valueLabel={`${config.comp_release} ms`}
+                />
+              }
             />
-          }
-        />
+          </>
+        ) : (
+          <Row
+            label={t('config.processing.ratio')}
+            right={
+              <LevelSelector
+                configKey="comp_ratio"
+                value={config.comp_ratio}
+                onChange={v => updateConfig({ comp_ratio: v })}
+              />
+            }
+          />
+        )}
       </div>
     </div>
   );
 }
 
 function SilenceSection() {
-  const { config, updateConfig } = useAppStore();
+  const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
@@ -413,44 +489,72 @@ function SilenceSection() {
         desc={t('config.silence.desc')}
         enabledKey="silence_trim_enabled"
       />
+      <SettingsBanner />
       <div className="tg-grp">
         <GrpHeader>{t('config.silence.conditions')}</GrpHeader>
-        <Row
-          label={t('config.silence.threshold')}
-          hint={t('config.silence.thresholdHint')}
-          right={
-            <SliderRow
-              id="silence-threshold" min={-50} max={-20} step={1}
-              value={config.silence_threshold_db}
-              onChange={v => updateConfig({ silence_threshold_db: v })}
-              valueLabel={`${config.silence_threshold_db} dB`}
+        {advancedMode ? (
+          <>
+            <Row
+              label={t('config.silence.threshold')}
+              hint={t('config.silence.thresholdHint')}
+              right={
+                <SliderRow
+                  id="silence-threshold" min={-50} max={-20} step={1}
+                  value={config.silence_threshold_db}
+                  onChange={v => updateConfig({ silence_threshold_db: v })}
+                  valueLabel={`${config.silence_threshold_db} dB`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.silence.minDuration')}
-          hint={t('config.silence.minDurationHint')}
-          right={
-            <SliderRow
-              id="silence-min-duration" min={0.5} max={10} step={0.5}
-              value={config.silence_min_duration}
-              onChange={v => updateConfig({ silence_min_duration: v })}
-              valueLabel={`${config.silence_min_duration.toFixed(1)} ${t('common.seconds')}`}
+            <Row
+              label={t('config.silence.minDuration')}
+              hint={t('config.silence.minDurationHint')}
+              right={
+                <SliderRow
+                  id="silence-min-duration" min={0.5} max={10} step={0.5}
+                  value={config.silence_min_duration}
+                  onChange={v => updateConfig({ silence_min_duration: v })}
+                  valueLabel={`${config.silence_min_duration.toFixed(1)} ${t('common.seconds')}`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.silence.afterCut')}
-          hint={t('config.silence.afterCutHint')}
-          right={
-            <SliderRow
-              id="silence-target-duration" min={0.1} max={3} step={0.1}
-              value={config.silence_target_duration}
-              onChange={v => updateConfig({ silence_target_duration: v })}
-              valueLabel={`${config.silence_target_duration.toFixed(1)} ${t('common.seconds')}`}
+            <Row
+              label={t('config.silence.afterCut')}
+              hint={t('config.silence.afterCutHint')}
+              right={
+                <SliderRow
+                  id="silence-target-duration" min={0.1} max={3} step={0.1}
+                  value={config.silence_target_duration}
+                  onChange={v => updateConfig({ silence_target_duration: v })}
+                  valueLabel={`${config.silence_target_duration.toFixed(1)} ${t('common.seconds')}`}
+                />
+              }
             />
-          }
-        />
+          </>
+        ) : (
+          <>
+            <Row
+              label={t('config.silence.threshold')}
+              right={
+                <LevelSelector
+                  configKey="silence_threshold_db"
+                  value={config.silence_threshold_db}
+                  onChange={v => updateConfig({ silence_threshold_db: v })}
+                />
+              }
+            />
+            <Row
+              label={t('config.silence.minDuration')}
+              right={
+                <LevelSelector
+                  configKey="silence_min_duration"
+                  value={config.silence_min_duration}
+                  onChange={v => updateConfig({ silence_min_duration: v })}
+                />
+              }
+            />
+          </>
+        )}
       </div>
       <Notice variant="warn">
         <strong>{t('config.silence.title')}</strong>{t('config.silence.notice').replace(t('config.silence.title'), '')}
@@ -460,7 +564,7 @@ function SilenceSection() {
 }
 
 function MixSection() {
-  const { config, updateConfig } = useAppStore();
+  const { config, updateConfig, advancedMode } = useAppStore();
   const { t, tf } = useTranslation();
   const [bgmFile, setBgmFile]             = useState<File | null>(null);
   const [endsceneFile, setEndsceneFile]   = useState<File | null>(null);
@@ -617,6 +721,7 @@ function MixSection() {
         title={t('config.mix.title')}
         desc={t('config.mix.desc')}
       />
+      <SettingsBanner />
 
       {/* BGM */}
       <div className="tg-grp">
@@ -650,39 +755,52 @@ function MixSection() {
           {bgmUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{bgmUrlError}</span>}
         </div>
         {bgmFile && (
-          <>
+          advancedMode ? (
+            <>
+              <Row
+                label={t('config.mix.bgmVolume')}
+                hint={t('config.mix.bgmVolumeHint')}
+                right={
+                  <SliderRow id="bgm-volume" min={-60} max={-20} step={1}
+                    value={config.bgm_target_lufs}
+                    onChange={v => updateConfig({ bgm_target_lufs: v })}
+                    valueLabel={`${config.bgm_target_lufs} LUFS`}
+                  />
+                }
+              />
+              <Row
+                label={t('config.mix.fadeIn')}
+                right={
+                  <SliderRow id="bgm-fade-in" min={0} max={10} step={0.5}
+                    value={config.bgm_fade_in}
+                    onChange={v => updateConfig({ bgm_fade_in: v })}
+                    valueLabel={`${config.bgm_fade_in.toFixed(1)} ${t('common.seconds')}`}
+                  />
+                }
+              />
+              <Row
+                label={t('config.mix.fadeOut')}
+                right={
+                  <SliderRow id="bgm-fade-out" min={0} max={10} step={0.5}
+                    value={config.bgm_fade_out}
+                    onChange={v => updateConfig({ bgm_fade_out: v })}
+                    valueLabel={`${config.bgm_fade_out.toFixed(1)} ${t('common.seconds')}`}
+                  />
+                }
+              />
+            </>
+          ) : (
             <Row
               label={t('config.mix.bgmVolume')}
-              hint={t('config.mix.bgmVolumeHint')}
               right={
-                <SliderRow id="bgm-volume" min={-60} max={-20} step={1}
+                <LevelSelector
+                  configKey="bgm_target_lufs"
                   value={config.bgm_target_lufs}
                   onChange={v => updateConfig({ bgm_target_lufs: v })}
-                  valueLabel={`${config.bgm_target_lufs} LUFS`}
                 />
               }
             />
-            <Row
-              label={t('config.mix.fadeIn')}
-              right={
-                <SliderRow id="bgm-fade-in" min={0} max={10} step={0.5}
-                  value={config.bgm_fade_in}
-                  onChange={v => updateConfig({ bgm_fade_in: v })}
-                  valueLabel={`${config.bgm_fade_in.toFixed(1)} ${t('common.seconds')}`}
-                />
-              }
-            />
-            <Row
-              label={t('config.mix.fadeOut')}
-              right={
-                <SliderRow id="bgm-fade-out" min={0} max={10} step={0.5}
-                  value={config.bgm_fade_out}
-                  onChange={v => updateConfig({ bgm_fade_out: v })}
-                  valueLabel={`${config.bgm_fade_out.toFixed(1)} ${t('common.seconds')}`}
-                />
-              }
-            />
-          </>
+          )
         )}
       </div>
 
@@ -717,7 +835,7 @@ function MixSection() {
           </div>
           {endsceneUrlError && <span style={{ fontSize: 11, color: 'var(--tg-red)' }}>{endsceneUrlError}</span>}
         </div>
-        {endsceneFile && (
+        {endsceneFile && advancedMode && (
           <Row
             label={t('config.mix.crossfade')}
             right={

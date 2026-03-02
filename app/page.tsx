@@ -9,6 +9,7 @@ import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 import { CutEditor } from '@/components/CutEditor';
+import { PresetPopover } from '@/components/PresetPopover';
 import { useTranslation, useLocaleStore } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
 
@@ -359,6 +360,9 @@ export default function Home() {
   const { t, locale } = useTranslation();
   const setLocale = useLocaleStore((s) => s.setLocale);
 
+  const advancedMode = useAppStore((s) => s.advancedMode);
+  const setAdvancedMode = useAppStore((s) => s.setAdvancedMode);
+
   const [mounted, setMounted]       = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>('source');
   const [processing, setProcessing] = useState(false);
@@ -468,25 +472,80 @@ export default function Home() {
       case 'source':
         return (
           <div className="p-6 flex flex-col gap-5">
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('source.title')}</h2>
-              <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('source.desc')}</p>
-            </div>
-            <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
-            <div className="tg-notice">
-              <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
-              <span>{t('source.browserNotice')}</span>
-            </div>
-            {(progress || result) && (
-              <div className="flex flex-col gap-4 mt-2">
-                {progress && !result && <ProcessingStatus progress={progress} />}
-                {result && (
-                  <ResultDownload
-                    blob={result}
-                    filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
-                  />
-                )}
+            {/* ファイル未選択時: ヒーローアップロード */}
+            {files.length === 0 ? (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                minHeight: 340, gap: 20,
+              }}>
+                <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                  <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--tg-t1)', letterSpacing: '-0.5px' }}>
+                    {t('source.heroTitle')}
+                  </h2>
+                  <p style={{ fontSize: 13, color: 'var(--tg-t2)', marginTop: 6 }}>
+                    {t('source.heroDesc')}
+                  </p>
+                </div>
+                <div style={{ width: '100%', maxWidth: 480 }}>
+                  <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
+                </div>
+                <div className="tg-notice" style={{ maxWidth: 480 }}>
+                  <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+                  <span>{t('source.browserNotice')}</span>
+                </div>
               </div>
+            ) : (
+              <>
+                {/* ファイル選択済み */}
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('source.title')}</h2>
+                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('source.desc')}</p>
+                </div>
+                <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
+
+                {/* ファイル2つ以上: 大きな処理実行ボタン + オプション説明 */}
+                {files.length >= 2 && !processing && !result && (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+                    padding: '24px 20px',
+                    background: 'rgba(10,132,255,0.04)',
+                    border: '1px solid rgba(10,132,255,0.12)',
+                    borderRadius: 16,
+                  }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--tg-t1)' }}>
+                      {t('source.readyToProcess')}
+                    </div>
+                    <button
+                      className="tg-btn tg-btn-primary"
+                      onClick={handleProcess}
+                      disabled={!canProcess}
+                      style={{ fontSize: 15, padding: '10px 32px' }}
+                    >
+                      <svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+                      {processLabel}
+                    </button>
+                    <p style={{ fontSize: 12, color: 'var(--tg-t3)', textAlign: 'center', maxWidth: 380 }}>
+                      {t('source.settingsOptional')}
+                    </p>
+                  </div>
+                )}
+
+                <div className="tg-notice">
+                  <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+                  <span>{t('source.browserNotice')}</span>
+                </div>
+                {(progress || result) && (
+                  <div className="flex flex-col gap-4 mt-2">
+                    {progress && !result && <ProcessingStatus progress={progress} />}
+                    {result && (
+                      <ResultDownload
+                        blob={result}
+                        filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         );
@@ -583,6 +642,24 @@ export default function Home() {
             </div>
           )}
 
+          {/* Simple / Advanced toggle */}
+          {mounted && (
+            <div className="tg-seg" style={{ marginLeft: 12 }}>
+              <button
+                className={`tg-seg-btn${!advancedMode ? ' active' : ''}`}
+                onClick={() => setAdvancedMode(false)}
+              >
+                {t('toolbar.simple')}
+              </button>
+              <button
+                className={`tg-seg-btn${advancedMode ? ' active' : ''}`}
+                onClick={() => setAdvancedMode(true)}
+              >
+                {t('toolbar.advanced')}
+              </button>
+            </div>
+          )}
+
           <div style={{ flex: 1 }} />
 
           {/* File badge */}
@@ -603,6 +680,9 @@ export default function Home() {
               </span>
             </div>
           )}
+
+          {/* Presets */}
+          {mounted && <PresetPopover />}
 
           {/* Reset */}
           <button className="tg-btn" onClick={resetConfig}>

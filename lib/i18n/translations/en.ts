@@ -19,6 +19,8 @@ export const en: Translations = {
     reset: 'Reset',
     processing: 'Processing...',
     runProcess: 'Process',
+    simple: 'Simple',
+    advanced: 'Advanced',
   },
   status: {
     processing: 'Processing',
@@ -46,9 +48,14 @@ export const en: Translations = {
     title: 'Audio Files',
     desc: 'Select audio files to process (Speaker A & B)',
     browserNotice: 'All processing runs in your browser. Files are never uploaded to a server.',
+    heroTitle: 'Drop your audio files to get started',
+    heroDesc: 'Upload 2 audio files (Speaker A & B) and press "Process"',
+    readyToProcess: 'Ready to process',
+    settingsOptional: 'All sidebar settings are optional. You can process right away.',
   },
   config: {
     enabled: 'Enabled',
+    settingsBanner: 'These settings are applied when you press "Process". Changes here do not affect your audio until processing.',
     trim: {
       title: 'Sync',
       desc: 'Trim before/after clap detection',
@@ -163,6 +170,28 @@ export const en: Translations = {
   result: {
     complete: 'Processing Complete!',
     download: 'Download',
+  },
+  levels: {
+    l1: 'Minimal',
+    l2: 'Subtle',
+    l3: 'Standard (Rec.)',
+    l4: 'Strong',
+    l5: 'Maximum',
+    custom: 'Custom',
+    actualValue: 'Actual: {value}',
+  },
+  presets: {
+    title: 'Presets',
+    save: 'Save current settings',
+    load: 'Load',
+    delete: 'Delete',
+    namePrompt: 'Enter preset name',
+    namePlaceholder: 'My Preset',
+    custom: 'Custom',
+    default: 'Default',
+    confirmDelete: 'Delete this preset?',
+    saved: 'Saved',
+    noPresets: 'No saved presets',
   },
   common: {
     seconds: 's',

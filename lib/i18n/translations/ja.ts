@@ -19,6 +19,8 @@ export const ja: Translations = {
     reset: 'リセット',
     processing: '処理中...',
     runProcess: '処理実行',
+    simple: 'シンプル',
+    advanced: '詳細',
   },
   status: {
     processing: '処理中',
@@ -46,9 +48,14 @@ export const ja: Translations = {
     title: '音声ファイル',
     desc: '処理対象の音声ファイルを選択（話者A・B）',
     browserNotice: 'すべての処理はブラウザ内で完結します。ファイルはサーバーに送信されません。',
+    heroTitle: '音声ファイルをドロップして始めましょう',
+    heroDesc: '2つの音声ファイル（話者A・B）をアップロードして「処理実行」を押すだけ',
+    readyToProcess: '処理の準備ができました',
+    settingsOptional: 'サイドバーの設定はすべてオプションです。そのまま処理を実行できます。',
   },
   config: {
     enabled: '有効',
+    settingsBanner: 'これらの設定は「処理実行」を押したときに適用されます。ここでの変更は処理を実行するまで音声に影響しません。',
     trim: {
       title: '同期',
       desc: 'クラップ音検出による前後カット',
@@ -163,6 +170,28 @@ export const ja: Translations = {
   result: {
     complete: '処理完了！',
     download: 'ダウンロード',
+  },
+  levels: {
+    l1: 'さらに弱い',
+    l2: '弱い',
+    l3: '標準（推奨）',
+    l4: '強い',
+    l5: 'さらに強い',
+    custom: 'カスタム',
+    actualValue: '実際の値: {value}',
+  },
+  presets: {
+    title: 'プリセット',
+    save: '現在の設定を保存',
+    load: '読み込み',
+    delete: '削除',
+    namePrompt: 'プリセット名を入力',
+    namePlaceholder: 'マイプリセット',
+    custom: 'カスタム',
+    default: 'デフォルト',
+    confirmDelete: 'このプリセットを削除しますか？',
+    saved: '保存しました',
+    noPresets: '保存済みプリセットなし',
   },
   common: {
     seconds: '秒',

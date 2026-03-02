@@ -22,7 +22,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
 
   // Stage 4: Dynamics
   comp_threshold: '-20dB',
-  comp_ratio: 3,
+  comp_ratio: 4,
   comp_attack: 5,
   comp_release: 50,
   limiter_limit: '-1dB',

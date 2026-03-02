@@ -10,6 +10,14 @@ interface AppState {
   updateConfig: (updates: Partial<ProcessConfig>) => void;
   resetConfig: () => void;
 
+  // シンプル/詳細モード
+  advancedMode: boolean;
+  setAdvancedMode: (v: boolean) => void;
+
+  // アクティブプリセット
+  activePresetId: string | null;
+  setActivePresetId: (id: string | null) => void;
+
   // 手動カット区間
   addCutRegion: (region: Omit<CutRegion, 'id'>) => void;
   removeCutRegion: (id: string) => void;
@@ -44,8 +52,17 @@ export const useAppStore = create<AppState>()(
       updateConfig: (updates) =>
         set((state) => ({
           config: { ...state.config, ...updates },
+          activePresetId: null, // 設定変更時にプリセット解除
         })),
-      resetConfig: () => set({ config: DEFAULT_CONFIG }),
+      resetConfig: () => set({ config: DEFAULT_CONFIG, activePresetId: null }),
+
+      // シンプル/詳細モード
+      advancedMode: false,
+      setAdvancedMode: (v) => set({ advancedMode: v }),
+
+      // アクティブプリセット
+      activePresetId: null,
+      setActivePresetId: (id) => set({ activePresetId: id }),
 
       // 手動カット区間
       addCutRegion: (region) =>
@@ -99,6 +116,8 @@ export const useAppStore = create<AppState>()(
           bgm: undefined,
           endscene: undefined,
         },
+        advancedMode: state.advancedMode,
+        activePresetId: state.activePresetId,
       }),
       // localStorageから読み込んだ設定をデフォルト値とマージ
       merge: (persistedState, currentState) => {
@@ -113,6 +132,8 @@ export const useAppStore = create<AppState>()(
             bgm: undefined,         // Fileオブジェクトは localStorage から復元不可（旧データの {} を除去）
             endscene: undefined,    // 同上
           },
+          advancedMode: ps?.advancedMode ?? false,
+          activePresetId: ps?.activePresetId ?? null,
         };
         return merged;
       },

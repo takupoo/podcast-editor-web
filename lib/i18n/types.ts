@@ -19,6 +19,8 @@ export interface Translations {
     reset: string;
     processing: string;
     runProcess: string;
+    simple: string;
+    advanced: string;
   };
   status: {
     processing: string;
@@ -46,9 +48,14 @@ export interface Translations {
     title: string;
     desc: string;
     browserNotice: string;
+    heroTitle: string;
+    heroDesc: string;
+    readyToProcess: string;
+    settingsOptional: string;
   };
   config: {
     enabled: string;
+    settingsBanner: string;
     trim: {
       title: string;
       desc: string;
@@ -163,6 +170,28 @@ export interface Translations {
   result: {
     complete: string;
     download: string;
+  };
+  levels: {
+    l1: string;
+    l2: string;
+    l3: string;
+    l4: string;
+    l5: string;
+    custom: string;
+    actualValue: string;
+  };
+  presets: {
+    title: string;
+    save: string;
+    load: string;
+    delete: string;
+    namePrompt: string;
+    namePlaceholder: string;
+    custom: string;
+    default: string;
+    confirmDelete: string;
+    saved: string;
+    noPresets: string;
   };
   common: {
     seconds: string;
