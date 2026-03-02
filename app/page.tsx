@@ -6,6 +6,7 @@ import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
 import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
+import { clearFileFromCache } from '@/lib/file-cache';
 import { CutEditor } from '@/components/CutEditor';
 import { PresetPopover } from '@/components/PresetPopover';
 import { CollapsibleSection } from '@/components/CollapsibleSection';
@@ -189,7 +190,7 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
 
 // ── Main ───────────────────────────────────────────────────────
 export default function Home() {
-  const { config, files, setFiles, removeFile, resetConfig } = useAppStore();
+  const { config, files, setFiles, removeFile, resetAll } = useAppStore();
   const { t, locale } = useTranslation();
   const setLocale = useLocaleStore((s) => s.setLocale);
 
@@ -398,7 +399,13 @@ export default function Home() {
             {mounted && <PresetPopover />}
 
             {/* Reset */}
-            <button className="tg-btn" onClick={resetConfig}>
+            <button className="tg-btn" onClick={() => {
+              resetAll();
+              setResult(null);
+              setProgress(null);
+              clearFileFromCache('bgm');
+              clearFileFromCache('endscene');
+            }}>
               <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
               {t('toolbar.reset')}
             </button>

@@ -75,7 +75,7 @@ export async function mixVoices(
     '-i',
     trackB,
     '-filter_complex',
-    '[0:a][1:a]amix=inputs=2:duration=first:normalize=0',
+    '[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0',
     output,
   ], 'Mix:voices');
 

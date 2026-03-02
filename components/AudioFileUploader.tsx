@@ -8,17 +8,6 @@ import { useTranslation } from '@/lib/i18n';
 type CacheKey = 'bgm' | 'endscene';
 type CacheStatus = 'none' | 'saving' | 'saved' | 'error';
 
-function extractFilename(url: string): string {
-  return url.split('/').pop()?.split('?')[0] ?? 'audio.mp3';
-}
-
-function toRawUrl(url: string): string {
-  return url.replace(
-    /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//,
-    'https://raw.githubusercontent.com/$1/'
-  );
-}
-
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -50,7 +39,7 @@ export function AudioFileUploader({ cacheKey, label, icon }: AudioFileUploaderPr
   const currentFilename = config[configFilenameKey] as string | undefined;
   const currentUrl = config[configUrlKey] as string | undefined;
 
-  // 自動復元: IndexedDB → URL フォールバック
+  // 自動復元: IndexedDB キャッシュのみ（URL自動fetchはセキュリティリスクのため除去）
   useEffect(() => {
     let cancelled = false;
     async function restore() {
@@ -60,21 +49,6 @@ export function AudioFileUploader({ cacheKey, label, icon }: AudioFileUploaderPr
           setFile(cached);
           setCacheStatus('saved');
           updateConfig({ [configFileKey]: cached, [configFilenameKey]: cached.name });
-        } else if (!cancelled && currentUrl) {
-          try {
-            const res = await fetch(currentUrl);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const buffer = await res.arrayBuffer();
-            const filename = currentFilename ?? extractFilename(currentUrl);
-            const f = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
-            if (!cancelled) {
-              setFile(f);
-              updateConfig({ [configFileKey]: f });
-              saveFileToCache(cacheKey, f).then(() => { if (!cancelled) setCacheStatus('saved'); });
-            }
-          } catch {
-            // URL からの復元失敗 — 静かに無視
-          }
         }
       } finally {
         if (!cancelled) setCacheLoading(false);
@@ -83,6 +57,15 @@ export function AudioFileUploader({ cacheKey, label, icon }: AudioFileUploaderPr
     restore();
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // config のファイルがクリアされたらローカル state もクリア（リセット連動）
+  const configFile = config[configFileKey] as File | undefined;
+  useEffect(() => {
+    if (!configFile && file) {
+      setFile(null);
+      setCacheStatus('none');
+    }
+  }, [configFile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];

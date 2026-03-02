@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ProcessConfig, ProcessProgress, CutRegion } from './pipeline/types';
+import { ProcessConfig, CutRegion } from './pipeline/types';
 import { DEFAULT_CONFIG } from './config';
 import { loadConfigFromUrl, mergeConfigWithDefaults } from './config-url';
 
@@ -9,6 +9,7 @@ interface AppState {
   config: ProcessConfig;
   updateConfig: (updates: Partial<ProcessConfig>) => void;
   resetConfig: () => void;
+  resetAll: () => void;
 
   // アクティブプリセット
   activePresetId: string | null;
@@ -24,16 +25,6 @@ interface AppState {
   setFiles: (files: File[]) => void;
   addFiles: (newFiles: File[]) => void;
   removeFile: (index: number) => void;
-
-  // 処理状態
-  processing: boolean;
-  progress: ProcessProgress | null;
-  setProcessing: (processing: boolean) => void;
-  setProgress: (progress: ProcessProgress | null) => void;
-
-  // 結果
-  result: Blob | null;
-  setResult: (result: Blob | null) => void;
 }
 
 // URLパラメータから設定を読み込み（初期化時のみ）
@@ -51,6 +42,11 @@ export const useAppStore = create<AppState>()(
           activePresetId: null, // 設定変更時にプリセット解除
         })),
       resetConfig: () => set({ config: DEFAULT_CONFIG, activePresetId: null }),
+      resetAll: () => set({
+        config: DEFAULT_CONFIG,
+        activePresetId: null,
+        files: [],
+      }),
 
       // アクティブプリセット
       activePresetId: null,
@@ -88,16 +84,6 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           files: state.files.filter((_, i) => i !== index),
         })),
-
-      // 処理状態
-      processing: false,
-      progress: null,
-      setProcessing: (processing) => set({ processing }),
-      setProgress: (progress) => set({ progress }),
-
-      // 結果
-      result: null,
-      setResult: (result) => set({ result }),
     }),
     {
       name: 'podcast-processor-storage',
