@@ -210,11 +210,17 @@ export default function Home() {
   useEffect(() => {
     if ('Notification' in window) {
       setNotifPerm(Notification.permission);
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(p => setNotifPerm(p));
-      }
     }
   }, []);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') return;
+    if (Notification.permission === 'default') {
+      const p = await Notification.requestPermission();
+      setNotifPerm(p);
+    }
+  };
 
   const notify = (title: string, body: string) => {
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -226,6 +232,8 @@ export default function Home() {
 
   const handleProcess = async () => {
     if (files.length < 2) return;
+    // Request notification permission when processing starts
+    await requestNotificationPermission();
     setProcessing(true);
     setResult(null);
     setProgress(null);
@@ -560,7 +568,10 @@ export default function Home() {
                 <span style={{ fontSize: 11, color: 'var(--tg-accent)', fontWeight: 600, minWidth: 36, textAlign: 'right' }}>
                   {progress?.percent || 0}%
                 </span>
-                <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                {notifPerm === 'granted' && (
+                  <span style={{ fontSize: 11, color: 'var(--tg-green)', whiteSpace: 'nowrap' }}>{t('status.notifyOnComplete')}</span>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: notifPerm === 'granted' ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
                   {progress?.message || t('status.processingDots')}
                 </span>
               </>
