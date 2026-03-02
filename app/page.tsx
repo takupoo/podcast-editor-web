@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useState, useEffect } from 'react';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
@@ -12,76 +11,9 @@ import { PresetPopover } from '@/components/PresetPopover';
 import { CollapsibleSection } from '@/components/CollapsibleSection';
 import { AudioFileUploader } from '@/components/AudioFileUploader';
 import { TrimSection, ProcessingSection, SilenceSection, MixParamsSection, ExportSection } from '@/components/ConfigPanel';
+import { FileUploader } from '@/components/FileUploader';
 import { useTranslation, useLocaleStore } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
-
-// ── Speaker drop zone ───────────────────────────────────────────
-function SpeakerDropZone({ label, file, onDrop, onRemove }: {
-  label: string;
-  file: File | null;
-  onDrop: (file: File) => void;
-  onRemove: () => void;
-}) {
-  const { t } = useTranslation();
-
-  const handleDrop = useCallback((accepted: File[]) => {
-    if (accepted.length > 0) onDrop(accepted[0]);
-  }, [onDrop]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: handleDrop,
-    accept: { 'audio/*': ['.mp3', '.wav', '.m4a'] },
-    multiple: false,
-  });
-
-  if (file) {
-    return (
-      <div className="tg-upload-zone has-file">
-        <svg style={{ width: 18, height: 18, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
-        </svg>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {file.name}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 1 }}>
-            {(file.size / 1024 / 1024).toFixed(2)} MB
-          </div>
-        </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          style={{
-            width: 24, height: 24, borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-            color: 'var(--tg-t2)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.15)'; e.currentTarget.style.borderColor = 'rgba(255,69,58,0.3)'; e.currentTarget.style.color = 'var(--tg-red)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--tg-t2)'; }}
-        >
-          <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M4 4l8 8M12 4l-8 8"/>
-          </svg>
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      {...getRootProps()}
-      className={`tg-upload-zone${isDragActive ? ' drag-active' : ''}`}
-    >
-      <input {...getInputProps()} />
-      <svg style={{ width: 28, height: 28, color: 'var(--tg-t3)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tg-t2)' }}>{label}</div>
-      <div style={{ fontSize: 11, color: 'var(--tg-t3)' }}>{t('upload.dropAudio')}</div>
-    </div>
-  );
-}
 
 // ── How to use modal ──────────────────────────────────────────
 function HowToUseModal({ onClose }: { onClose: () => void }) {
@@ -341,37 +273,6 @@ export default function Home() {
     ? files.map(f => f.name).join('  ·  ')
     : t('status.noFile');
 
-  // ── File handling for speaker drop zones ────────────────────
-  const speakerA = files[0] ?? null;
-  const speakerB = files[1] ?? null;
-
-  const handleSpeakerADrop = (file: File) => {
-    const newFiles = [...files];
-    newFiles[0] = file;
-    setFiles(newFiles);
-  };
-  const handleSpeakerBDrop = (file: File) => {
-    const newFiles = [...files];
-    if (newFiles.length === 0) {
-      // No file A yet — add placeholder? No, just set at index 1
-      // Actually we need index 0 to exist first for array
-      newFiles.push(file); // This would be index 0, wrong
-      // Better: if no A yet, ask user to add A first? No, just set properly
-      setFiles([files[0] ?? file, file !== files[0] ? file : files[1] ?? file].filter(Boolean));
-      return;
-    }
-    newFiles[1] = file;
-    setFiles(newFiles);
-  };
-  const handleRemoveSpeakerA = () => {
-    const newFiles = files.filter((_, i) => i !== 0);
-    setFiles(newFiles);
-  };
-  const handleRemoveSpeakerB = () => {
-    const newFiles = files.filter((_, i) => i !== 1);
-    setFiles(newFiles);
-  };
-
   // ── Section dot states ──────────────────────────────────────
   const trimDot: 'on' | 'off' = 'on'; // always enabled
   const processingDot: 'on' | 'off' = config.denoise_enabled ? 'on' : 'off';
@@ -500,24 +401,15 @@ export default function Home() {
 
             {/* ── Upload Zone (always visible) ── */}
             <div style={{ padding: '24px 0' }}>
-              {/* Speaker A / B */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <SpeakerDropZone
-                  label={t('upload.speakerA')}
-                  file={speakerA}
-                  onDrop={handleSpeakerADrop}
-                  onRemove={handleRemoveSpeakerA}
-                />
-                <SpeakerDropZone
-                  label={t('upload.speakerB')}
-                  file={speakerB}
-                  onDrop={handleSpeakerBDrop}
-                  onRemove={handleRemoveSpeakerB}
-                />
-              </div>
+              {/* Audio files (unified drop zone) */}
+              <FileUploader
+                files={files}
+                onFilesChange={setFiles}
+                onRemoveFile={removeFile}
+              />
 
               {/* BGM / Endscene compact file selectors */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
                 <AudioFileUploader
                   cacheKey="bgm"
                   label={t('upload.bgm')}
