@@ -44,6 +44,18 @@ export interface Translations {
     dropHere: string;
     dropOrClick: string;
   };
+  upload: {
+    speakerA: string;
+    speakerB: string;
+    bgm: string;
+    endscene: string;
+    dropAudio: string;
+    needTwoFiles: string;
+  };
+  settings: {
+    title: string;
+    allOptional: string;
+  };
   source: {
     title: string;
     desc: string;

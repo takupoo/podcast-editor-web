@@ -201,25 +201,13 @@ function FileStatus({ file, cacheStatus, url, onClear }: {
   );
 }
 
-// ── Section panels ─────────────────────────────────────────────
+// ── Section panels (exported for use in page.tsx collapsible sections) ──
 
-function TrimSection() {
+export function TrimSection() {
   const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
-      <StageHeader
-        icon={
-          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <line x1="6" y1="9" x2="6" y2="3"/><line x1="18" y1="9" x2="18" y2="3"/>
-            <line x1="2" y1="17" x2="22" y2="17"/>
-            <path d="M6 9 L2 13"/><path d="M6 9 L10 13"/><path d="M18 9 L14 13"/><path d="M18 9 L22 13"/>
-          </svg>
-        }
-        title={t('config.trim.title')}
-        desc={t('config.trim.desc')}
-      />
-      <SettingsBanner />
       <div className="tg-grp" style={{ background: 'linear-gradient(145deg,rgba(255,159,10,0.06),transparent)' }}>
         <GrpHeader>{t('config.trim.detection')}</GrpHeader>
         {advancedMode ? (
@@ -281,23 +269,19 @@ function TrimSection() {
   );
 }
 
-function ProcessingSection() {
+export function ProcessingSection() {
   const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
-      {/* ノイズ除去 */}
-      <StageHeader
-        icon={
-          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M2 12 Q5 4 8 12 Q11 20 14 12 Q17 4 20 8"/><path d="M20 8 L22 8"/>
-          </svg>
-        }
-        title={t('config.processing.title')}
-        desc={t('config.processing.desc')}
-        enabledKey="denoise_enabled"
-      />
-      <SettingsBanner />
+      {/* Denoise toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--tg-t2)' }}>{t('config.enabled')}</span>
+        <Switch
+          checked={config.denoise_enabled}
+          onCheckedChange={(v) => updateConfig({ denoise_enabled: v })}
+        />
+      </div>
 
       {/* Denoise method — advanced only */}
       {advancedMode && (
@@ -474,22 +458,19 @@ function ProcessingSection() {
   );
 }
 
-function SilenceSection() {
+export function SilenceSection() {
   const { config, updateConfig, advancedMode } = useAppStore();
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
-      <StageHeader
-        icon={
-          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M9 9v6M12 5v14M15 9v6M3 12h3M18 12h3"/>
-          </svg>
-        }
-        title={t('config.silence.title')}
-        desc={t('config.silence.desc')}
-        enabledKey="silence_trim_enabled"
-      />
-      <SettingsBanner />
+      {/* Enable toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--tg-t2)' }}>{t('config.enabled')}</span>
+        <Switch
+          checked={config.silence_trim_enabled}
+          onCheckedChange={(v) => updateConfig({ silence_trim_enabled: v })}
+        />
+      </div>
       <div className="tg-grp">
         <GrpHeader>{t('config.silence.conditions')}</GrpHeader>
         {advancedMode ? (
@@ -563,6 +544,192 @@ function SilenceSection() {
   );
 }
 
+/** BGM/エンドシーンのパラメータのみ（ファイル選択は AudioFileUploader に分離済み） */
+export function MixParamsSection() {
+  const { config, updateConfig, advancedMode } = useAppStore();
+  const { t } = useTranslation();
+  const hasBgm = !!(config.bgm_filename || config.bgm);
+  const hasEndscene = !!(config.endscene_filename || config.endscene);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* BGM パラメータ */}
+      {hasBgm && (
+        <div className="tg-grp">
+          <GrpHeader>{t('config.mix.bgmVolume')}</GrpHeader>
+          {advancedMode ? (
+            <>
+              <Row
+                label={t('config.mix.bgmVolume')}
+                hint={t('config.mix.bgmVolumeHint')}
+                right={
+                  <SliderRow id="bgm-volume" min={-60} max={-20} step={1}
+                    value={config.bgm_target_lufs}
+                    onChange={v => updateConfig({ bgm_target_lufs: v })}
+                    valueLabel={`${config.bgm_target_lufs} LUFS`}
+                  />
+                }
+              />
+              <Row
+                label={t('config.mix.fadeIn')}
+                right={
+                  <SliderRow id="bgm-fade-in" min={0} max={10} step={0.5}
+                    value={config.bgm_fade_in}
+                    onChange={v => updateConfig({ bgm_fade_in: v })}
+                    valueLabel={`${config.bgm_fade_in.toFixed(1)} ${t('common.seconds')}`}
+                  />
+                }
+              />
+              <Row
+                label={t('config.mix.fadeOut')}
+                right={
+                  <SliderRow id="bgm-fade-out" min={0} max={10} step={0.5}
+                    value={config.bgm_fade_out}
+                    onChange={v => updateConfig({ bgm_fade_out: v })}
+                    valueLabel={`${config.bgm_fade_out.toFixed(1)} ${t('common.seconds')}`}
+                  />
+                }
+              />
+            </>
+          ) : (
+            <Row
+              label={t('config.mix.bgmVolume')}
+              right={
+                <LevelSelector
+                  configKey="bgm_target_lufs"
+                  value={config.bgm_target_lufs}
+                  onChange={v => updateConfig({ bgm_target_lufs: v })}
+                />
+              }
+            />
+          )}
+        </div>
+      )}
+
+      {/* Endscene パラメータ */}
+      {hasEndscene && advancedMode && (
+        <div className="tg-grp">
+          <GrpHeader>{t('config.mix.endsceneFile')}</GrpHeader>
+          <Row
+            label={t('config.mix.crossfade')}
+            right={
+              <SliderRow id="endscene-crossfade" min={0} max={5} step={0.5}
+                value={config.endscene_crossfade}
+                onChange={v => updateConfig({ endscene_crossfade: v })}
+                valueLabel={`${config.endscene_crossfade.toFixed(1)} ${t('common.seconds')}`}
+              />
+            }
+          />
+        </div>
+      )}
+
+      {/* URL 入力 — BGM */}
+      <MixUrlLoader cacheKey="bgm" />
+      {/* URL 入力 — Endscene */}
+      <MixUrlLoader cacheKey="endscene" />
+    </div>
+  );
+}
+
+/** URL からの読み込みUI（折りたたみ内で使用） */
+function MixUrlLoader({ cacheKey }: { cacheKey: 'bgm' | 'endscene' }) {
+  const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
+  const urlKey = cacheKey === 'bgm' ? 'bgm_url' : 'endscene_url';
+  const filenameKey = cacheKey === 'bgm' ? 'bgm_filename' : 'endscene_filename';
+  const fileKey = cacheKey === 'bgm' ? 'bgm' : 'endscene';
+  const label = cacheKey === 'bgm' ? t('config.mix.bgmFile') : t('config.mix.endsceneFile');
+
+  const [url, setUrl] = useState(config[urlKey] as string ?? '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLoad = async () => {
+    if (!url) return;
+    setLoading(true); setError(null);
+    const rawUrl = toRawUrl(url);
+    if (rawUrl !== url) setUrl(rawUrl);
+    try {
+      const res = await fetch(rawUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buffer = await res.arrayBuffer();
+      const filename = extractFilename(rawUrl);
+      const file = new File([buffer], filename, { type: res.headers.get('content-type') ?? 'audio/mpeg' });
+      updateConfig({ [fileKey]: file, [filenameKey]: filename, [urlKey]: rawUrl });
+      saveFileToCache(cacheKey, file);
+    } catch { setError(t('config.mix.urlError')); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="tg-grp">
+      <GrpHeader>{label} — {t('config.mix.loadFromUrl')}</GrpHeader>
+      <div style={{ padding: '8px 16px', display: 'flex', gap: 8 }}>
+        <input
+          type="url" value={url}
+          onChange={e => setUrl(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLoad()}
+          placeholder={t('config.mix.urlPlaceholder')}
+          className="tg-input"
+        />
+        <button onClick={handleLoad} disabled={loading || !url} className="tg-btn" style={{ flexShrink: 0 }}>
+          {loading ? t('config.mix.loading') : t('config.mix.loadFromUrl')}
+        </button>
+      </div>
+      {error && <div style={{ padding: '0 16px 8px', fontSize: 11, color: 'var(--tg-red)' }}>{error}</div>}
+    </div>
+  );
+}
+
+export function ExportSection() {
+  const { config, updateConfig } = useAppStore();
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="tg-grp">
+        <GrpHeader>{t('config.export.format')}</GrpHeader>
+        <Row
+          label={t('config.export.outputFormat')}
+          right={
+            <div className="tg-seg">
+              {(['mp3', 'wav'] as const).map(fmt => (
+                <button
+                  key={fmt}
+                  className={`tg-seg-btn${config.output_format === fmt ? ' active' : ''}`}
+                  onClick={() => updateConfig({ output_format: fmt })}
+                >
+                  {fmt.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          }
+        />
+        {config.output_format === 'mp3' && (
+          <Row
+            label={t('config.export.bitrate')}
+            right={
+              <div className="tg-seg">
+                {(['128k', '192k', '256k', '320k'] as const).map(br => (
+                  <button
+                    key={br}
+                    className={`tg-seg-btn${config.mp3_bitrate === br ? ' active' : ''}`}
+                    onClick={() => updateConfig({ mp3_bitrate: br })}
+                  >
+                    {br}
+                  </button>
+                ))}
+              </div>
+            }
+          />
+        )}
+      </div>
+      <Notice>{t('config.export.bitrateNotice')}</Notice>
+    </div>
+  );
+}
+
+// ── Legacy full MixSection (kept for compatibility but no longer used in new layout) ──
+
 function MixSection() {
   const { config, updateConfig, advancedMode } = useAppStore();
   const { t, tf } = useTranslation();
@@ -578,12 +745,10 @@ function MixSection() {
   const [endsceneUrlLoading, setEndsceneUrlLoading] = useState(false);
   const [endsceneUrlError, setEndsceneUrlError]     = useState<string | null>(null);
 
-  // 自動復元: まず IndexedDB → キャッシュミス + URL あり → fetch → キャッシュ保存
   useEffect(() => {
     let cancelled = false;
     async function restoreFiles() {
       try {
-        // BGM 復元
         const bgmCached = await loadFileFromCache('bgm');
         if (!cancelled && bgmCached) {
           setBgmFile(bgmCached);
@@ -606,7 +771,6 @@ function MixSection() {
           }
         }
 
-        // Endscene 復元
         const endsceneCached = await loadFileFromCache('endscene');
         if (!cancelled && endsceneCached) {
           setEndsceneFile(endsceneCached);
@@ -848,62 +1012,6 @@ function MixSection() {
           />
         )}
       </div>
-    </div>
-  );
-}
-
-function ExportSection() {
-  const { config, updateConfig } = useAppStore();
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-col gap-4">
-      <StageHeader
-        icon={
-          <svg style={{ width: 21, height: 21, color: '#fff' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M12 3v13M5 10l7 7 7-7"/><path d="M4 20h16"/>
-          </svg>
-        }
-        title={t('config.export.title')}
-        desc={t('config.export.desc')}
-      />
-      <div className="tg-grp">
-        <GrpHeader>{t('config.export.format')}</GrpHeader>
-        <Row
-          label={t('config.export.outputFormat')}
-          right={
-            <div className="tg-seg">
-              {(['mp3', 'wav'] as const).map(fmt => (
-                <button
-                  key={fmt}
-                  className={`tg-seg-btn${config.output_format === fmt ? ' active' : ''}`}
-                  onClick={() => updateConfig({ output_format: fmt })}
-                >
-                  {fmt.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          }
-        />
-        {config.output_format === 'mp3' && (
-          <Row
-            label={t('config.export.bitrate')}
-            right={
-              <div className="tg-seg">
-                {(['128k', '192k', '256k', '320k'] as const).map(br => (
-                  <button
-                    key={br}
-                    className={`tg-seg-btn${config.mp3_bitrate === br ? ' active' : ''}`}
-                    onClick={() => updateConfig({ mp3_bitrate: br })}
-                  >
-                    {br}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-        )}
-      </div>
-      <Notice>{t('config.export.bitrateNotice')}</Notice>
     </div>
   );
 }

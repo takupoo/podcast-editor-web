@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { FileUploader } from '@/components/FileUploader';
+import { useState, useEffect, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
@@ -10,75 +9,78 @@ import { processPodcast } from '@/lib/pipeline/processor';
 import { ProcessProgress } from '@/lib/pipeline/types';
 import { CutEditor } from '@/components/CutEditor';
 import { PresetPopover } from '@/components/PresetPopover';
+import { CollapsibleSection } from '@/components/CollapsibleSection';
+import { AudioFileUploader } from '@/components/AudioFileUploader';
+import { TrimSection, ProcessingSection, SilenceSection, MixParamsSection, ExportSection } from '@/components/ConfigPanel';
 import { useTranslation, useLocaleStore } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
 
-// SSR時のHydrationエラーを防ぐためSSRを無効化
-import type { ConfigSection } from '@/components/ConfigPanel';
-const ConfigPanel = dynamic<{ activeSection: ConfigSection }>(
-  () => import('@/components/ConfigPanel').then((m) => ({ default: m.ConfigPanel })),
-  { ssr: false }
-);
+// ── Speaker drop zone ───────────────────────────────────────────
+function SpeakerDropZone({ label, file, onDrop, onRemove }: {
+  label: string;
+  file: File | null;
+  onDrop: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
 
-// ── Section types ─────────────────────────────────────────────
-type SectionId =
-  | 'source'
-  | 'trim'
-  | 'cut'
-  | 'processing'
-  | 'silence'
-  | 'mix'
-  | 'export';
+  const handleDrop = useCallback((accepted: File[]) => {
+    if (accepted.length > 0) onDrop(accepted[0]);
+  }, [onDrop]);
 
-interface NavItem {
-  id: SectionId;
-  labelKey: string;
-  dot: (config: ReturnType<typeof useAppStore.getState>['config']) => 'on' | 'off' | null;
-}
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: handleDrop,
+    accept: { 'audio/*': ['.mp3', '.wav', '.m4a'] },
+    multiple: false,
+  });
 
-interface NavGroup {
-  labelKey: string;
-  items: NavItem[];
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    labelKey: 'nav.editing',
-    items: [
-      { id: 'trim',       labelKey: 'nav.sync',             dot: () => 'on' },
-      { id: 'cut',        labelKey: 'nav.manualCut',        dot: (c) => c.cut_regions.length > 0 ? 'on' : null },
-      { id: 'processing', labelKey: 'nav.audioProcessing',  dot: (c) => c.denoise_enabled ? 'on' : 'off' },
-      { id: 'silence',    labelKey: 'nav.silenceCut',       dot: (c) => c.silence_trim_enabled ? 'on' : 'off' },
-      { id: 'mix',        labelKey: 'nav.bgmEnding',        dot: (c) => (c.bgm_filename || c.endscene_filename) ? 'on' : 'off' },
-    ],
-  },
-  {
-    labelKey: 'nav.output',
-    items: [
-      { id: 'export', labelKey: 'nav.export', dot: () => null },
-    ],
-  },
-];
-
-// ── Stage icon as SVG string component ────────────────────────
-function NavIcon({ id }: { id: SectionId }) {
-  const cls = 'w-3.5 h-3.5';
-  switch (id) {
-    case 'source':
-      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>;
-    case 'trim':
-      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M4 5h8M4 11h8M2 8h12"/></svg>;
-    case 'cut':
-      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>;
-    case 'processing':
-      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>;
-    case 'silence':
-      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2"/></svg>;
-    case 'mix':
-      return <svg className={cls} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>;
-    case 'export':
-      return <svg className={cls} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M8 2v9M4 8l4 4 4-4M2 13h12"/></svg>;
+  if (file) {
+    return (
+      <div className="tg-upload-zone has-file">
+        <svg style={{ width: 18, height: 18, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+        </svg>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {file.name}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 1 }}>
+            {(file.size / 1024 / 1024).toFixed(2)} MB
+          </div>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          style={{
+            width: 24, height: 24, borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
+            color: 'var(--tg-t2)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,69,58,0.15)'; e.currentTarget.style.borderColor = 'rgba(255,69,58,0.3)'; e.currentTarget.style.color = 'var(--tg-red)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--tg-t2)'; }}
+        >
+          <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8"/>
+          </svg>
+        </button>
+      </div>
+    );
   }
+
+  return (
+    <div
+      {...getRootProps()}
+      className={`tg-upload-zone${isDragActive ? ' drag-active' : ''}`}
+    >
+      <input {...getInputProps()} />
+      <svg style={{ width: 28, height: 28, color: 'var(--tg-t3)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tg-t2)' }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--tg-t3)' }}>{t('upload.dropAudio')}</div>
+    </div>
+  );
 }
 
 // ── How to use modal ──────────────────────────────────────────
@@ -198,154 +200,53 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
 
         {/* Body */}
         <div style={{ overflowY: 'auto', padding: '16px 24px 24px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-
-          {/* ── Main flow section ── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
-          }}>
-            <span style={{
-              fontSize: 11, fontWeight: 700, color: 'var(--tg-green)',
-              background: 'rgba(48,209,88,0.15)',
-              borderRadius: 6, padding: '2px 9px',
-              letterSpacing: '0.5px',
-            }}>
+          {/* Main flow */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--tg-green)', background: 'rgba(48,209,88,0.15)', borderRadius: 6, padding: '2px 9px', letterSpacing: '0.5px' }}>
               {t('howToUse.mainFlowLabel')}
             </span>
           </div>
-
-          {/* Main steps with connector line */}
           <div style={{ position: 'relative', paddingLeft: 18 }}>
-            {/* Vertical connector line */}
-            <div style={{
-              position: 'absolute', left: 17, top: 18, bottom: 18,
-              width: 2, background: 'rgba(48,209,88,0.25)',
-              borderRadius: 1,
-            }} />
-
+            <div style={{ position: 'absolute', left: 17, top: 18, bottom: 18, width: 2, background: 'rgba(48,209,88,0.25)', borderRadius: 1 }} />
             {mainSteps.map((step, i) => (
-              <div
-                key={step.num}
-                style={{
-                  display: 'flex', gap: 16, padding: '12px 0',
-                  position: 'relative',
-                }}
-              >
-                {/* Step number circle on the line */}
-                <div style={{
-                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(48,209,88,0.15)',
-                  border: '2px solid rgba(48,209,88,0.4)',
-                  color: 'var(--tg-green)',
-                  fontSize: 14, fontWeight: 700,
-                  position: 'relative', zIndex: 1,
-                }}>
+              <div key={step.num} style={{ display: 'flex', gap: 16, padding: '12px 0', position: 'relative' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(48,209,88,0.15)', border: '2px solid rgba(48,209,88,0.4)', color: 'var(--tg-green)', fontSize: 14, fontWeight: 700, position: 'relative', zIndex: 1 }}>
                   {step.icon}
                 </div>
                 <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, color: 'var(--tg-green)',
-                      opacity: 0.7,
-                    }}>
-                      {step.num}
-                    </span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>
-                      {step.title}
-                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--tg-green)', opacity: 0.7 }}>{step.num}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--tg-t1)' }}>{step.title}</span>
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 4, lineHeight: 1.6 }}>
-                    {step.desc}
-                  </p>
-                  {/* Arrow connector between steps */}
+                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 4, lineHeight: 1.6 }}>{step.desc}</p>
                   {i < mainSteps.length - 1 && (
-                    <div style={{
-                      marginTop: 8,
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      color: 'var(--tg-t3)', fontSize: 11,
-                    }}>
-                      <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                        <path d="M8 3v10M4 9l4 4 4-4"/>
-                      </svg>
+                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--tg-t3)', fontSize: 11 }}>
+                      <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg>
                     </div>
                   )}
                 </div>
               </div>
             ))}
           </div>
-
-          {/* ── Divider ── */}
-          <div style={{
-            height: 1, background: 'rgba(255,255,255,0.06)',
-            margin: '16px 0',
-          }} />
-
-          {/* ── Options section ── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-          }}>
-            <span style={{
-              fontSize: 11, fontWeight: 700, color: 'var(--tg-t2)',
-              background: 'rgba(255,255,255,0.08)',
-              borderRadius: 6, padding: '2px 9px',
-              letterSpacing: '0.5px',
-            }}>
-              {t('howToUse.optionsLabel')}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>
-              {t('howToUse.optionsDesc')}
-            </span>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '16px 0' }} />
+          {/* Options */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--tg-t2)', background: 'rgba(255,255,255,0.08)', borderRadius: 6, padding: '2px 9px', letterSpacing: '0.5px' }}>{t('howToUse.optionsLabel')}</span>
+            <span style={{ fontSize: 11, color: 'var(--tg-t3)' }}>{t('howToUse.optionsDesc')}</span>
           </div>
-
-          {/* Option cards - 2x2 grid */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-          }}>
-            {options.map((opt) => (
-              <div
-                key={opt.title}
-                style={{
-                  padding: '12px 14px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 12,
-                }}
-              >
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6,
-                }}>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: 'var(--tg-t2)',
-                  }}>
-                    {opt.icon}
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tg-t1)' }}>
-                    {opt.title}
-                  </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {options.map(opt => (
+              <div key={opt.title} style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--tg-t2)' }}>{opt.icon}</div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tg-t1)' }}>{opt.title}</span>
                 </div>
-                <p style={{ fontSize: 11, color: 'var(--tg-t3)', lineHeight: 1.55 }}>
-                  {opt.desc}
-                </p>
+                <p style={{ fontSize: 11, color: 'var(--tg-t3)', lineHeight: 1.55 }}>{opt.desc}</p>
               </div>
             ))}
           </div>
-
-          {/* Privacy note */}
-          <div style={{
-            marginTop: 16, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 13px',
-            background: 'rgba(48,209,88,0.06)',
-            border: '1px solid rgba(48,209,88,0.15)',
-            borderRadius: 10,
-            fontSize: 11, color: 'var(--tg-t2)', lineHeight: 1.5,
-          }}>
-            <svg style={{ width: 14, height: 14, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5zM8 9a1 1 0 0 1 .5 1.87V12.5h-1v-1.63A1 1 0 0 1 8 9z"/>
-            </svg>
+          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', background: 'rgba(48,209,88,0.06)', border: '1px solid rgba(48,209,88,0.15)', borderRadius: 10, fontSize: 11, color: 'var(--tg-t2)', lineHeight: 1.5 }}>
+            <svg style={{ width: 14, height: 14, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5zM8 9a1 1 0 0 1 .5 1.87V12.5h-1v-1.63A1 1 0 0 1 8 9z"/></svg>
             <span>{t('howToUse.privacyNote')}</span>
           </div>
         </div>
@@ -364,7 +265,6 @@ export default function Home() {
   const setAdvancedMode = useAppStore((s) => s.setAdvancedMode);
 
   const [mounted, setMounted]       = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionId>('source');
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState<ProcessProgress | null>(null);
   const [result, setResult]         = useState<Blob | null>(null);
@@ -374,7 +274,6 @@ export default function Home() {
 
   useEffect(() => setMounted(true), []);
 
-  // Set html lang attribute
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
@@ -389,25 +288,10 @@ export default function Home() {
   }, []);
 
   const notify = (title: string, body: string) => {
-    console.log('notify called:', { title, body, permission: Notification.permission });
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        try {
-          const notification = new Notification(title, {
-            body,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico',
-            tag: 'podcast-processor',
-          });
-          console.log('Notification created:', notification);
-        } catch (error) {
-          console.error('Failed to create notification:', error);
-        }
-      } else {
-        console.log('Notification permission not granted:', Notification.permission);
-      }
-    } else {
-      console.log('Notification API not supported');
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body, icon: '/favicon.ico', badge: '/favicon.ico', tag: 'podcast-processor' });
+      } catch { /* ignore */ }
     }
   };
 
@@ -419,7 +303,6 @@ export default function Home() {
     try {
       const output = await processPodcast(files[0], files[1], config, p => setProgress(p));
       setResult(output);
-      setActiveSection('source');
       notify(t('notifications.completeTitle'), t('notifications.completeBody'));
     } catch (error) {
       setProgress({ stage: 'error', percent: 0, message: `${t('notifications.errorOccurred')} ${error}` });
@@ -428,7 +311,6 @@ export default function Home() {
       setProcessing(false);
     }
   };
-
 
   const handleDownload = () => {
     if (!result) return;
@@ -462,391 +344,362 @@ export default function Home() {
     ? files.map(f => f.name).join('  ·  ')
     : t('status.noFile');
 
-  // ── Sidebar nav sections ────────────────────────────────────
+  // ── File handling for speaker drop zones ────────────────────
+  const speakerA = files[0] ?? null;
+  const speakerB = files[1] ?? null;
 
-  const navigate = (id: SectionId) => setActiveSection(id);
-
-  // ── Render panel content ────────────────────────────────────
-  const renderPanel = () => {
-    switch (activeSection) {
-      case 'source':
-        return (
-          <div className="p-6 flex flex-col gap-5">
-            {/* ファイル未選択時: ヒーローアップロード */}
-            {files.length === 0 ? (
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                minHeight: 340, gap: 20,
-              }}>
-                <div style={{ textAlign: 'center', marginBottom: 8 }}>
-                  <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--tg-t1)', letterSpacing: '-0.5px' }}>
-                    {t('source.heroTitle')}
-                  </h2>
-                  <p style={{ fontSize: 13, color: 'var(--tg-t2)', marginTop: 6 }}>
-                    {t('source.heroDesc')}
-                  </p>
-                </div>
-                <div style={{ width: '100%', maxWidth: 480 }}>
-                  <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
-                </div>
-                <div className="tg-notice" style={{ maxWidth: 480 }}>
-                  <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
-                  <span>{t('source.browserNotice')}</span>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* ファイル選択済み */}
-                <div>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>{t('source.title')}</h2>
-                  <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 2 }}>{t('source.desc')}</p>
-                </div>
-                <FileUploader files={files} onFilesChange={setFiles} onRemoveFile={removeFile} />
-
-                {/* ファイル2つ以上: 大きな処理実行ボタン + オプション説明 */}
-                {files.length >= 2 && !processing && !result && (
-                  <div style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-                    padding: '24px 20px',
-                    background: 'rgba(10,132,255,0.04)',
-                    border: '1px solid rgba(10,132,255,0.12)',
-                    borderRadius: 16,
-                  }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--tg-t1)' }}>
-                      {t('source.readyToProcess')}
-                    </div>
-                    <button
-                      className="tg-btn tg-btn-primary"
-                      onClick={handleProcess}
-                      disabled={!canProcess}
-                      style={{ fontSize: 15, padding: '10px 32px' }}
-                    >
-                      <svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
-                      {processLabel}
-                    </button>
-                    <p style={{ fontSize: 12, color: 'var(--tg-t3)', textAlign: 'center', maxWidth: 380 }}>
-                      {t('source.settingsOptional')}
-                    </p>
-                  </div>
-                )}
-
-                <div className="tg-notice">
-                  <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
-                  <span>{t('source.browserNotice')}</span>
-                </div>
-                {(progress || result) && (
-                  <div className="flex flex-col gap-4 mt-2">
-                    {progress && !result && <ProcessingStatus progress={progress} />}
-                    {result && (
-                      <ResultDownload
-                        blob={result}
-                        filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
-                      />
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        );
-      case 'cut':
-        return <CutEditor />;
-      default:
-        return (
-          <ConfigPanel activeSection={activeSection} />
-        );
-    }
+  const handleSpeakerADrop = (file: File) => {
+    const newFiles = [...files];
+    newFiles[0] = file;
+    setFiles(newFiles);
   };
+  const handleSpeakerBDrop = (file: File) => {
+    const newFiles = [...files];
+    if (newFiles.length === 0) {
+      // No file A yet — add placeholder? No, just set at index 1
+      // Actually we need index 0 to exist first for array
+      newFiles.push(file); // This would be index 0, wrong
+      // Better: if no A yet, ask user to add A first? No, just set properly
+      setFiles([files[0] ?? file, file !== files[0] ? file : files[1] ?? file].filter(Boolean));
+      return;
+    }
+    newFiles[1] = file;
+    setFiles(newFiles);
+  };
+  const handleRemoveSpeakerA = () => {
+    const newFiles = files.filter((_, i) => i !== 0);
+    setFiles(newFiles);
+  };
+  const handleRemoveSpeakerB = () => {
+    const newFiles = files.filter((_, i) => i !== 1);
+    setFiles(newFiles);
+  };
+
+  // ── Section dot states ──────────────────────────────────────
+  const trimDot: 'on' | 'off' = 'on'; // always enabled
+  const processingDot: 'on' | 'off' = config.denoise_enabled ? 'on' : 'off';
+  const silenceDot: 'on' | 'off' = config.silence_trim_enabled ? 'on' : 'off';
+  const mixDot: 'on' | 'off' = (config.bgm_filename || config.endscene_filename) ? 'on' : 'off';
 
   return (
     <div className="tg-root flex items-stretch justify-center min-h-dvh">
-      {/* Main container */}
       <div
         className="tg-window flex flex-col w-full overflow-hidden"
         style={{ minHeight: '100dvh' }}
       >
-        {/* ── Header ────────────────────────────────────────── */}
-        <div
-          className="flex items-center px-6 shrink-0"
-          style={{
-            height: 56,
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(255,255,255,0.02)',
-          }}
-        >
-          <div style={{
-            fontSize: 16, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px',
-          }}>
-            Spectratrek
-          </div>
-          <div style={{ flex: 1 }} />
-          {/* Language switcher */}
-          {mounted && (
-            <div className="tg-seg" style={{ marginLeft: 'auto' }}>
-              {(['en', 'ja'] as Locale[]).map(l => (
-                <button
-                  key={l}
-                  className={`tg-seg-btn${locale === l ? ' active' : ''}`}
-                  onClick={() => setLocale(l)}
-                >
-                  {l.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* ── Single column container ── */}
+        <div style={{ maxWidth: 720, margin: '0 auto', width: '100%', padding: '0 20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
 
-        {/* ── Toolbar ───────────────────────────────────────── */}
-        <div
-          className="flex items-center px-6 gap-3 shrink-0"
-          style={{
-            height: 52,
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(255,255,255,0.03)',
-          }}
-        >
-          {/* Segmented preview/full */}
-          {mounted && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="tg-seg">
-                <button
-                  className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
-                  onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
-                >
-                  {t('toolbar.fullProcess')}
-                </button>
-                <button
-                  className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
-                  onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
-                >
-                  {t('toolbar.preview')}
-                </button>
-              </div>
-              {config.preview_mode && (
-                <select
-                  value={config.preview_duration}
-                  onChange={e => useAppStore.getState().updateConfig({ preview_duration: Number(e.target.value) })}
-                  style={{
-                    fontSize: 11, color: 'var(--tg-t1)',
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 5, padding: '3px 6px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {[10, 15, 20, 30, 45, 60].map(v => (
-                    <option key={v} value={v}>{v}{t('common.seconds')}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* Simple / Advanced toggle */}
-          {mounted && (
-            <div className="tg-seg" style={{ marginLeft: 12 }}>
-              <button
-                className={`tg-seg-btn${!advancedMode ? ' active' : ''}`}
-                onClick={() => setAdvancedMode(false)}
-              >
-                {t('toolbar.simple')}
-              </button>
-              <button
-                className={`tg-seg-btn${advancedMode ? ' active' : ''}`}
-                onClick={() => setAdvancedMode(true)}
-              >
-                {t('toolbar.advanced')}
-              </button>
-            </div>
-          )}
-
-          <div style={{ flex: 1 }} />
-
-          {/* File badge */}
-          {files.length > 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '4px 12px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.11)',
-              borderRadius: 100,
-              fontSize: 12, color: 'var(--tg-t1)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
-              maxWidth: 240, overflow: 'hidden',
-            }}>
-              <svg style={{ width: 12, height: 12, color: 'var(--tg-t3)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {files.length}
-              </span>
-            </div>
-          )}
-
-          {/* Presets */}
-          {mounted && <PresetPopover />}
-
-          {/* Reset */}
-          <button className="tg-btn" onClick={resetConfig}>
-            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
-            {t('toolbar.reset')}
-          </button>
-
-          {/* Process */}
-          <button
-            className="tg-btn tg-btn-primary"
-            onClick={handleProcess}
-            disabled={!canProcess}
+          {/* ── Header ────────────────────────────────────────── */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', height: 56,
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              flexShrink: 0,
+            }}
           >
-            <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
-            {processLabel}
-          </button>
-        </div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--tg-t1)', letterSpacing: '-0.3px' }}>
+              Spectratrek
+            </div>
+            <div style={{ flex: 1 }} />
 
-        {/* ── Body ──────────────────────────────────────────── */}
-        <div className="flex flex-1 overflow-hidden">
-
-          {/* Sidebar */}
-          <aside
-            className="tg-sidebar shrink-0 flex flex-col py-2"
-            style={{ width: 220, overflowY: 'auto' }}
-          >
-            {/* Source */}
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{t('nav.source')}</div>
+            {/* Help button */}
             <button
-              className={`tg-nav${activeSection === 'source' ? ' active' : ''}`}
-              onClick={() => navigate('source')}
+              onClick={() => setShowHelp(true)}
+              style={{
+                width: 28, height: 28, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                color: 'var(--tg-t2)', cursor: 'pointer',
+                marginRight: 8,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
             >
-              <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === 'source' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                <NavIcon id="source" />
-              </div>
-              <span style={{ fontSize: 13, color: activeSection === 'source' ? 'var(--tg-t1)' : 'var(--tg-t2)' }}>{t('nav.audioFiles')}</span>
-              {files.length > 0 && (
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--tg-t3)' }}>
-                  {files.length}
-                </span>
-              )}
+              <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2.5a2.5 2.5 0 0 1 2.13 3.78l-.63.84A1.5 1.5 0 0 0 9 9.5v.5H7v-.5a3.5 3.5 0 0 1 .88-2.31l.62-.83A.5.5 0 0 0 8 5.5a.5.5 0 0 0-1 0H5A2.5 2.5 0 0 1 8 3.5zM7 11h2v2H7v-2z"/>
+              </svg>
             </button>
 
-            {NAV_GROUPS.map(group => {
-              const dotStates = group.items.map(item => item.dot(config));
-              return (
-                <div key={group.labelKey}>
-                  <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '8px 0' }} />
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tg-t3)', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '8px 16px 3px' }}>{t(group.labelKey as Parameters<typeof t>[0])}</div>
-                  {group.items.map((item, i) => {
-                    const dot = dotStates[i];
-                    return (
-                      <button
-                        key={item.id}
-                        className={`tg-nav${activeSection === item.id ? ' active' : ''}`}
-                        onClick={() => navigate(item.id)}
-                      >
-                        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: activeSection === item.id ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                          <NavIcon id={item.id} />
-                        </div>
-                        <span style={{ fontSize: 13, color: activeSection === item.id ? 'var(--tg-t1)' : 'var(--tg-t2)', flex: 1, textAlign: 'left' }}>{t(item.labelKey as Parameters<typeof t>[0])}</span>
-                        {dot !== null && (
-                          <div className={`tg-dot ${dot === 'on' ? 'tg-dot-on' : 'tg-dot-off'}`} style={{ marginLeft: 'auto', flexShrink: 0 }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </aside>
-
-          {/* Main panel */}
-          <main
-            className="flex-1 overflow-y-auto"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
-          >
-            {renderPanel()}
-          </main>
-        </div>
-
-        {/* ── Status bar ────────────────────────────────────── */}
-        <div
-          className="flex items-center px-4 gap-3 shrink-0"
-          style={{
-            height: processing ? 32 : 24,
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(0,0,0,0.15)',
-            transition: 'height 0.2s',
-          }}
-        >
-          {!processing ? (
-            <>
-              <div style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: result ? 'var(--tg-green)' : 'var(--tg-green)',
-                boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : '0 0 6px rgba(48,209,88,.3)',
-              }} />
-              <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
-              {result && (
-                <button
-                  onClick={handleDownload}
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'var(--tg-green)',
-                    background: 'rgba(48,209,88,0.15)',
-                    border: '1px solid rgba(48,209,88,0.3)',
-                    borderRadius: 6,
-                    padding: '3px 10px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(48,209,88,0.25)';
-                    e.currentTarget.style.borderColor = 'rgba(48,209,88,0.5)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(48,209,88,0.15)';
-                    e.currentTarget.style.borderColor = 'rgba(48,209,88,0.3)';
-                  }}
-                >
-                  <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
-                  </svg>
-                  {t('status.download')}
-                </button>
-              )}
-              {notifPerm === 'granted' && !result && (
-                <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>{t('status.notifyOnComplete')}</span>
-              )}
-              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: (notifPerm === 'granted' && !result) ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
-            </>
-          ) : (
-            <>
-              <div style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: 'var(--tg-accent)',
-                boxShadow: '0 0 6px rgba(10,132,255,.5)',
-              }} />
-              <span style={{ fontSize: 11, color: 'var(--tg-t1)', fontWeight: 500 }}>{progress?.stage || t('status.processing')}</span>
-              <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', maxWidth: 200 }}>
-                <div style={{
-                  height: '100%',
-                  width: `${progress?.percent || 0}%`,
-                  background: 'linear-gradient(90deg, var(--tg-accent), var(--tg-green))',
-                  borderRadius: 2,
-                  transition: 'width 0.3s ease-out',
-                  boxShadow: '0 0 8px rgba(10,132,255,0.4)',
-                }} />
+            {/* Language switcher */}
+            {mounted && (
+              <div className="tg-seg">
+                {(['en', 'ja'] as Locale[]).map(l => (
+                  <button
+                    key={l}
+                    className={`tg-seg-btn${locale === l ? ' active' : ''}`}
+                    onClick={() => setLocale(l)}
+                  >
+                    {l.toUpperCase()}
+                  </button>
+                ))}
               </div>
-              <span style={{ fontSize: 11, color: 'var(--tg-accent)', fontWeight: 600, minWidth: 36, textAlign: 'right' }}>
-                {progress?.percent || 0}%
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                {progress?.message || t('status.processingDots')}
-              </span>
-            </>
-          )}
+            )}
+          </div>
+
+          {/* ── Toolbar ───────────────────────────────────────── */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 0',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+              flexWrap: 'wrap',
+            }}
+          >
+            {/* Full/Preview toggle */}
+            {mounted && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="tg-seg">
+                  <button
+                    className={`tg-seg-btn${!config.preview_mode ? ' active' : ''}`}
+                    onClick={() => useAppStore.getState().updateConfig({ preview_mode: false })}
+                  >
+                    {t('toolbar.fullProcess')}
+                  </button>
+                  <button
+                    className={`tg-seg-btn${config.preview_mode ? ' active' : ''}`}
+                    onClick={() => useAppStore.getState().updateConfig({ preview_mode: true })}
+                  >
+                    {t('toolbar.preview')}
+                  </button>
+                </div>
+                {config.preview_mode && (
+                  <select
+                    value={config.preview_duration}
+                    onChange={e => useAppStore.getState().updateConfig({ preview_duration: Number(e.target.value) })}
+                    style={{
+                      fontSize: 11, color: 'var(--tg-t1)',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 5, padding: '3px 6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {[10, 15, 20, 30, 45, 60].map(v => (
+                      <option key={v} value={v}>{v}{t('common.seconds')}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Simple / Advanced */}
+            {mounted && (
+              <div className="tg-seg" style={{ marginLeft: 4 }}>
+                <button
+                  className={`tg-seg-btn${!advancedMode ? ' active' : ''}`}
+                  onClick={() => setAdvancedMode(false)}
+                >
+                  {t('toolbar.simple')}
+                </button>
+                <button
+                  className={`tg-seg-btn${advancedMode ? ' active' : ''}`}
+                  onClick={() => setAdvancedMode(true)}
+                >
+                  {t('toolbar.advanced')}
+                </button>
+              </div>
+            )}
+
+            <div style={{ flex: 1 }} />
+
+            {/* Presets */}
+            {mounted && <PresetPopover />}
+
+            {/* Reset */}
+            <button className="tg-btn" onClick={resetConfig}>
+              <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
+              {t('toolbar.reset')}
+            </button>
+          </div>
+
+          {/* ── Main scrollable content ── */}
+          <main style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+
+            {/* ── Upload Zone (always visible) ── */}
+            <div style={{ padding: '24px 0' }}>
+              {/* Speaker A / B */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <SpeakerDropZone
+                  label={t('upload.speakerA')}
+                  file={speakerA}
+                  onDrop={handleSpeakerADrop}
+                  onRemove={handleRemoveSpeakerA}
+                />
+                <SpeakerDropZone
+                  label={t('upload.speakerB')}
+                  file={speakerB}
+                  onDrop={handleSpeakerBDrop}
+                  onRemove={handleRemoveSpeakerB}
+                />
+              </div>
+
+              {/* BGM / Endscene compact file selectors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <AudioFileUploader
+                  cacheKey="bgm"
+                  label={t('upload.bgm')}
+                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>}
+                />
+                <AudioFileUploader
+                  cacheKey="endscene"
+                  label={t('upload.endscene')}
+                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>}
+                />
+              </div>
+            </div>
+
+            {/* ── Process Button ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingBottom: 20 }}>
+              <button
+                className="tg-process-btn"
+                onClick={handleProcess}
+                disabled={!canProcess}
+              >
+                <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+                {processLabel}
+              </button>
+              {files.length < 2 && (
+                <div style={{ fontSize: 12, color: 'var(--tg-t3)', textAlign: 'center' }}>
+                  {t('upload.needTwoFiles')}
+                </div>
+              )}
+              {files.length >= 2 && !processing && !result && (
+                <div style={{ fontSize: 12, color: 'var(--tg-t3)', textAlign: 'center' }}>
+                  {t('settings.allOptional')}
+                </div>
+              )}
+            </div>
+
+            {/* ── Progress / Result ── */}
+            {(progress || result) && (
+              <div style={{ paddingBottom: 16 }}>
+                {progress && !result && <ProcessingStatus progress={progress} />}
+                {result && (
+                  <ResultDownload
+                    blob={result}
+                    filename={result.type === 'audio/wav' ? 'podcast_output.wav' : 'podcast_output.mp3'}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* ── Privacy notice ── */}
+            <div className="tg-notice" style={{ marginBottom: 12 }}>
+              <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+              <span>{t('source.browserNotice')}</span>
+            </div>
+
+            {/* ── Divider ── */}
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 8 }} />
+
+            {/* ── Collapsible Settings ── */}
+            <CollapsibleSection title={t('config.trim.title')} dot={trimDot}>
+              <TrimSection />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={t('config.processing.title')} dot={processingDot}>
+              <ProcessingSection />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={t('config.silence.title')} dot={silenceDot}>
+              <SilenceSection />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={t('config.mix.title')} dot={mixDot}>
+              <MixParamsSection />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={t('cutEditor.title')}>
+              <CutEditor />
+            </CollapsibleSection>
+
+            <CollapsibleSection title={t('config.export.title')}>
+              <ExportSection />
+            </CollapsibleSection>
+
+            {/* Bottom padding */}
+            <div style={{ height: 24 }} />
+          </main>
+
+          {/* ── Status bar ────────────────────────────────────── */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              height: processing ? 32 : 24,
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(0,0,0,0.15)',
+              flexShrink: 0,
+              transition: 'height 0.2s',
+            }}
+          >
+            {!processing ? (
+              <>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--tg-green)',
+                  boxShadow: result ? '0 0 6px rgba(48,209,88,.5)' : '0 0 6px rgba(48,209,88,.3)',
+                }} />
+                <span style={{ fontSize: 11, color: 'var(--tg-t2)' }}>{statusText}</span>
+                {result && (
+                  <button
+                    onClick={handleDownload}
+                    style={{
+                      fontSize: 11, fontWeight: 600, color: 'var(--tg-green)',
+                      background: 'rgba(48,209,88,0.15)',
+                      border: '1px solid rgba(48,209,88,0.3)',
+                      borderRadius: 6, padding: '3px 10px',
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(48,209,88,0.25)'; e.currentTarget.style.borderColor = 'rgba(48,209,88,0.5)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(48,209,88,0.15)'; e.currentTarget.style.borderColor = 'rgba(48,209,88,0.3)'; }}
+                  >
+                    <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                      <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
+                    </svg>
+                    {t('status.download')}
+                  </button>
+                )}
+                {notifPerm === 'granted' && !result && (
+                  <span style={{ fontSize: 11, color: 'var(--tg-green)', marginLeft: 'auto' }}>{t('status.notifyOnComplete')}</span>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: (notifPerm === 'granted' && !result) ? 0 : 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>{fileInfoText}</span>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: 'var(--tg-accent)',
+                  boxShadow: '0 0 6px rgba(10,132,255,.5)',
+                }} />
+                <span style={{ fontSize: 11, color: 'var(--tg-t1)', fontWeight: 500 }}>{progress?.stage || t('status.processing')}</span>
+                <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', maxWidth: 200 }}>
+                  <div style={{
+                    height: '100%', width: `${progress?.percent || 0}%`,
+                    background: 'linear-gradient(90deg, var(--tg-accent), var(--tg-green))',
+                    borderRadius: 2, transition: 'width 0.3s ease-out',
+                    boxShadow: '0 0 8px rgba(10,132,255,0.4)',
+                  }} />
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--tg-accent)', fontWeight: 600, minWidth: 36, textAlign: 'right' }}>
+                  {progress?.percent || 0}%
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--tg-t3)', marginLeft: 'auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                  {progress?.message || t('status.processingDots')}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Help modal */}
+      {showHelp && <HowToUseModal onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

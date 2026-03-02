@@ -44,6 +44,18 @@ export const ja: Translations = {
     dropHere: 'ここにドロップ',
     dropOrClick: '複数ファイルをドロップまたはクリックして選択',
   },
+  upload: {
+    speakerA: 'Speaker A',
+    speakerB: 'Speaker B',
+    bgm: 'BGM',
+    endscene: 'エンドシーン',
+    dropAudio: '音声ファイルをドロップ',
+    needTwoFiles: 'Speaker A と B の音声をアップロードしてください',
+  },
+  settings: {
+    title: '設定（オプション）',
+    allOptional: '設定はすべてオプションです。そのまま処理を実行できます。',
+  },
   source: {
     title: '音声ファイル',
     desc: '処理対象の音声ファイルを選択（話者A・B）',

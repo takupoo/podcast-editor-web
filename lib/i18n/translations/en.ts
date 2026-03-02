@@ -44,6 +44,18 @@ export const en: Translations = {
     dropHere: 'Drop here',
     dropOrClick: 'Drop multiple files or click to select',
   },
+  upload: {
+    speakerA: 'Speaker A',
+    speakerB: 'Speaker B',
+    bgm: 'BGM',
+    endscene: 'End Scene',
+    dropAudio: 'Drop audio file',
+    needTwoFiles: 'Please upload Speaker A and B audio files',
+  },
+  settings: {
+    title: 'Settings (optional)',
+    allOptional: 'All settings are optional. You can process right away.',
+  },
   source: {
     title: 'Audio Files',
     desc: 'Select audio files to process (Speaker A & B)',

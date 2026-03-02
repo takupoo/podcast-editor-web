@@ -10,7 +10,7 @@ interface LevelSelectorProps {
   value: number;
   /** 実数値で返すコールバック */
   onChange: (numericValue: number) => void;
-  /** カスタムラベル配列 (5要素)。省略時は i18n の汎用ラベルを使用 */
+  /** カスタムラベル配列 (5要素)。省略時は数値+単位を表示 */
   labels?: [string, string, string, string, string];
 }
 
@@ -22,52 +22,53 @@ export function LevelSelector({ configKey, value, onChange, labels }: LevelSelec
   const currentLevel = numericToLevel(configKey, value);
   const isCustom = !isExactLevel(configKey, value);
 
-  const defaultLabels: [string, string, string, string, string] = [
-    t('levels.l1'),
-    t('levels.l2'),
-    t('levels.l3'),
-    t('levels.l4'),
-    t('levels.l5'),
-  ];
-  const displayLabels = labels ?? defaultLabels;
-
   const handleClick = (level: LevelValue) => {
     onChange(levelToNumeric(configKey, level));
+  };
+
+  /** 数値+単位のラベルを生成 */
+  const formatValueLabel = (numericValue: number, unit: string): string => {
+    if (unit === ':1') return `${numericValue}:1`;
+    if (unit === 's') return `${numericValue}s`;
+    return `${numericValue} ${unit}`;
   };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div className="tg-level-seg">
-        {([1, 2, 3, 4, 5] as LevelValue[]).map((level) => (
-          <button
-            key={level}
-            type="button"
-            className={[
-              'tg-level-btn',
-              currentLevel === level ? 'active' : '',
-              level === 3 ? 'recommended' : '',
-            ].filter(Boolean).join(' ')}
-            onClick={() => handleClick(level)}
-          >
-            {displayLabels[level - 1]}
-          </button>
-        ))}
+        {([1, 2, 3, 4, 5] as LevelValue[]).map((level) => {
+          const numVal = mapping.levels[level - 1];
+          const displayLabel = labels
+            ? labels[level - 1]
+            : formatValueLabel(numVal, mapping.unit);
+
+          return (
+            <button
+              key={level}
+              type="button"
+              className={[
+                'tg-level-btn',
+                currentLevel === level ? 'active' : '',
+                level === 3 ? 'recommended' : '',
+              ].filter(Boolean).join(' ')}
+              onClick={() => handleClick(level)}
+            >
+              {displayLabel}
+            </button>
+          );
+        })}
       </div>
-      <div style={{
-        fontSize: 10,
-        color: 'var(--tg-t3)',
-        textAlign: 'right',
-        fontFamily: 'var(--font-mono, monospace)',
-        paddingRight: 2,
-      }}>
-        {isCustom ? (
-          <span style={{ color: 'var(--tg-orange)' }}>
-            {t('levels.custom')}: {value} {mapping.unit}
-          </span>
-        ) : (
-          <span>{value} {mapping.unit}</span>
-        )}
-      </div>
+      {isCustom && (
+        <div style={{
+          fontSize: 10,
+          color: 'var(--tg-orange)',
+          textAlign: 'right',
+          fontFamily: 'var(--font-mono, monospace)',
+          paddingRight: 2,
+        }}>
+          {t('levels.custom')}: {value} {mapping.unit}
+        </div>
+      )}
     </div>
   );
 }
