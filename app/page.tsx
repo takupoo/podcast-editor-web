@@ -261,9 +261,6 @@ export default function Home() {
   const { t, locale } = useTranslation();
   const setLocale = useLocaleStore((s) => s.setLocale);
 
-  const advancedMode = useAppStore((s) => s.advancedMode);
-  const setAdvancedMode = useAppStore((s) => s.setAdvancedMode);
-
   const [mounted, setMounted]       = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState<ProcessProgress | null>(null);
@@ -483,24 +480,6 @@ export default function Home() {
                     ))}
                   </select>
                 )}
-              </div>
-            )}
-
-            {/* Simple / Advanced */}
-            {mounted && (
-              <div className="tg-seg" style={{ marginLeft: 4 }}>
-                <button
-                  className={`tg-seg-btn${!advancedMode ? ' active' : ''}`}
-                  onClick={() => setAdvancedMode(false)}
-                >
-                  {t('toolbar.simple')}
-                </button>
-                <button
-                  className={`tg-seg-btn${advancedMode ? ' active' : ''}`}
-                  onClick={() => setAdvancedMode(true)}
-                >
-                  {t('toolbar.advanced')}
-                </button>
               </div>
             )}
 

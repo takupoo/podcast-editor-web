@@ -10,10 +10,6 @@ interface AppState {
   updateConfig: (updates: Partial<ProcessConfig>) => void;
   resetConfig: () => void;
 
-  // シンプル/詳細モード
-  advancedMode: boolean;
-  setAdvancedMode: (v: boolean) => void;
-
   // アクティブプリセット
   activePresetId: string | null;
   setActivePresetId: (id: string | null) => void;
@@ -55,10 +51,6 @@ export const useAppStore = create<AppState>()(
           activePresetId: null, // 設定変更時にプリセット解除
         })),
       resetConfig: () => set({ config: DEFAULT_CONFIG, activePresetId: null }),
-
-      // シンプル/詳細モード
-      advancedMode: false,
-      setAdvancedMode: (v) => set({ advancedMode: v }),
 
       // アクティブプリセット
       activePresetId: null,
@@ -116,7 +108,6 @@ export const useAppStore = create<AppState>()(
           bgm: undefined,
           endscene: undefined,
         },
-        advancedMode: state.advancedMode,
         activePresetId: state.activePresetId,
       }),
       // localStorageから読み込んだ設定をデフォルト値とマージ
@@ -132,7 +123,6 @@ export const useAppStore = create<AppState>()(
             bgm: undefined,         // Fileオブジェクトは localStorage から復元不可（旧データの {} を除去）
             endscene: undefined,    // 同上
           },
-          advancedMode: ps?.advancedMode ?? false,
           activePresetId: ps?.activePresetId ?? null,
         };
         return merged;
