@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n';
 
 const ONBOARDING_KEY = 'spectratrek-onboarding-seen';
@@ -205,7 +206,13 @@ function StepSlide({ stepIndex, totalSteps, onNext, onBack, onSkip }: SlideProps
                     boxShadow: isLast ? '0 4px 16px rgba(48,209,88,0.4)' : '0 4px 16px rgba(0,90,200,0.4)',
                 }}>{isLast ? t('onboarding.getStarted') : t('onboarding.next')}</button>
             </div>
-            {!isLast && (
+            {isLast ? (
+                <Link href="/guide" onClick={onSkip} style={{
+                    fontSize: 12, color: 'var(--tg-accent)', background: 'none', border: 'none',
+                    cursor: 'pointer', padding: '4px 8px', textDecoration: 'none',
+                    transition: 'opacity 0.15s',
+                }}>{t('onboarding.viewGuide')} →</Link>
+            ) : (
                 <button onClick={onSkip} style={{
                     fontSize: 11, color: 'var(--tg-t3)', background: 'none', border: 'none',
                     cursor: 'pointer', padding: '4px 8px',
