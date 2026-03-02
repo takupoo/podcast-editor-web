@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { ResultDownload } from '@/components/ResultDownload';
 import { useAppStore } from '@/lib/store';
@@ -15,6 +16,7 @@ import { TrimSection, ProcessingSection, SilenceSection, MixParamsSection, Expor
 import { FileUploader } from '@/components/FileUploader';
 import { useTranslation, useLocaleStore } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
+import { OnboardingWizard, useOnboarding } from '@/components/OnboardingWizard';
 
 // ── How to use modal ──────────────────────────────────────────
 function HowToUseModal({ onClose }: { onClose: () => void }) {
@@ -33,19 +35,19 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
       num: '1',
       title: t('howToUse.mainStep1Title'),
       desc: t('howToUse.mainStep1Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z"/></svg>,
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1zM9 2l3 3H9V2zm3 11H4V2h4v4h4v7z" /></svg>,
     },
     {
       num: '2',
       title: t('howToUse.mainStep2Title'),
       desc: t('howToUse.mainStep2Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>,
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z" /></svg>,
     },
     {
       num: '3',
       title: t('howToUse.mainStep3Title'),
       desc: t('howToUse.mainStep3Desc'),
-      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>,
+      icon: <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z" /></svg>,
     },
   ];
 
@@ -53,22 +55,22 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
     {
       title: t('howToUse.option1Title'),
       desc: t('howToUse.option1Desc'),
-      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="12" r="2"/><path d="M13 3L6.5 10.5M6.5 5.5L13 13"/></svg>,
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="5" cy="4" r="2" /><circle cx="5" cy="12" r="2" /><path d="M13 3L6.5 10.5M6.5 5.5L13 13" /></svg>,
     },
     {
       title: t('howToUse.option2Title'),
       desc: t('howToUse.option2Desc'),
-      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75"/></svg>,
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor"><path d="M2 5h2v6H2V5zm3-2h2v10H5V3zm3 2h2v6H8V5zm3-3h2v12h-2V2z" opacity=".75" /></svg>,
     },
     {
       title: t('howToUse.option3Title'),
       desc: t('howToUse.option3Desc'),
-      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2"/></svg>,
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8h3M11 8h3M8 4v2M8 10v2" /></svg>,
     },
     {
       title: t('howToUse.option4Title'),
       desc: t('howToUse.option4Desc'),
-      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8a6 6 0 1 1 12 0A6 6 0 0 1 2 8z"/><path d="M8 5v3l2 1.5"/></svg>,
+      icon: <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2 8a6 6 0 1 1 12 0A6 6 0 0 1 2 8z" /><path d="M8 5v3l2 1.5" /></svg>,
     },
   ];
 
@@ -126,7 +128,7 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
           >
             <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M4 4l8 8M12 4l-8 8"/>
+              <path d="M4 4l8 8M12 4l-8 8" />
             </svg>
           </button>
         </div>
@@ -154,7 +156,7 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
                   <p style={{ fontSize: 12, color: 'var(--tg-t2)', marginTop: 4, lineHeight: 1.6 }}>{step.desc}</p>
                   {i < mainSteps.length - 1 && (
                     <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--tg-t3)', fontSize: 11 }}>
-                      <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M4 9l4 4 4-4"/></svg>
+                      <svg style={{ width: 12, height: 12 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M4 9l4 4 4-4" /></svg>
                     </div>
                   )}
                 </div>
@@ -179,7 +181,7 @@ function HowToUseModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', background: 'rgba(48,209,88,0.06)', border: '1px solid rgba(48,209,88,0.15)', borderRadius: 10, fontSize: 11, color: 'var(--tg-t2)', lineHeight: 1.5 }}>
-            <svg style={{ width: 14, height: 14, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5zM8 9a1 1 0 0 1 .5 1.87V12.5h-1v-1.63A1 1 0 0 1 8 9z"/></svg>
+            <svg style={{ width: 14, height: 14, color: 'var(--tg-green)', flexShrink: 0 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5zM8 9a1 1 0 0 1 .5 1.87V12.5h-1v-1.63A1 1 0 0 1 8 9z" /></svg>
             <span>{t('howToUse.privacyNote')}</span>
           </div>
         </div>
@@ -194,13 +196,14 @@ export default function Home() {
   const { t, locale } = useTranslation();
   const setLocale = useLocaleStore((s) => s.setLocale);
 
-  const [mounted, setMounted]       = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [progress, setProgress]     = useState<ProcessProgress | null>(null);
-  const [result, setResult]         = useState<Blob | null>(null);
+  const [progress, setProgress] = useState<ProcessProgress | null>(null);
+  const [result, setResult] = useState<Blob | null>(null);
 
-  const [notifPerm, setNotifPerm]   = useState<NotificationPermission>('default');
-  const [showHelp, setShowHelp]     = useState(false);
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission>('default');
+  const [showHelp, setShowHelp] = useState(false);
+  const { show: showOnboarding, dismiss: dismissOnboarding } = useOnboarding();
 
   useEffect(() => setMounted(true), []);
 
@@ -319,16 +322,37 @@ export default function Home() {
                 background: 'rgba(255,255,255,0.07)',
                 border: '1px solid rgba(255,255,255,0.09)',
                 color: 'var(--tg-t2)', cursor: 'pointer',
-                marginRight: 8,
+                marginRight: 4,
                 transition: 'background 0.15s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
             >
               <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2.5a2.5 2.5 0 0 1 2.13 3.78l-.63.84A1.5 1.5 0 0 0 9 9.5v.5H7v-.5a3.5 3.5 0 0 1 .88-2.31l.62-.83A.5.5 0 0 0 8 5.5a.5.5 0 0 0-1 0H5A2.5 2.5 0 0 1 8 3.5zM7 11h2v2H7v-2z"/>
+                <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2.5a2.5 2.5 0 0 1 2.13 3.78l-.63.84A1.5 1.5 0 0 0 9 9.5v.5H7v-.5a3.5 3.5 0 0 1 .88-2.31l.62-.83A.5.5 0 0 0 8 5.5a.5.5 0 0 0-1 0H5A2.5 2.5 0 0 1 8 3.5zM7 11h2v2H7v-2z" />
               </svg>
             </button>
+
+            {/* Guide link */}
+            <Link
+              href="/guide"
+              style={{
+                width: 28, height: 28, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                color: 'var(--tg-t2)', cursor: 'pointer',
+                marginRight: 8,
+                transition: 'background 0.15s',
+                textDecoration: 'none',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+            >
+              <svg style={{ width: 14, height: 14 }} viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.879a1.5 1.5 0 0 1 1.06.44l1.122 1.12A1.5 1.5 0 0 0 9.62 4H13.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z" />
+              </svg>
+            </Link>
 
             {/* Language switcher */}
             {mounted && (
@@ -406,7 +430,7 @@ export default function Home() {
               clearFileFromCache('bgm');
               clearFileFromCache('endscene');
             }}>
-              <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z"/></svg>
+              <svg style={{ width: 13, height: 13 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5H12a4 4 0 1 1-4-4V2.5zm1.5 0V6h3.5L9.5 2.5z" /></svg>
               {t('toolbar.reset')}
             </button>
           </div>
@@ -428,12 +452,12 @@ export default function Home() {
                 <AudioFileUploader
                   cacheKey="bgm"
                   label={t('upload.bgm')}
-                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>}
+                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z" /></svg>}
                 />
                 <AudioFileUploader
                   cacheKey="endscene"
                   label={t('upload.endscene')}
-                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z"/></svg>}
+                  icon={<svg style={{ width: 16, height: 16 }} viewBox="0 0 16 16" fill="currentColor"><path d="M10 2v8.27A2.5 2.5 0 1 1 8 8V5L4 6V3l6-1z" /></svg>}
                 />
               </div>
             </div>
@@ -445,7 +469,7 @@ export default function Home() {
                 onClick={handleProcess}
                 disabled={!canProcess}
               >
-                <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z"/></svg>
+                <svg style={{ width: 18, height: 18 }} viewBox="0 0 16 16" fill="currentColor"><path d="M6 3.5l7 4.5-7 4.5V3.5z" /></svg>
                 {processLabel}
               </button>
               {files.length < 2 && (
@@ -475,7 +499,7 @@ export default function Home() {
 
             {/* ── Privacy notice ── */}
             <div className="tg-notice" style={{ marginBottom: 12 }}>
-              <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+              <svg style={{ width: 14, height: 14, color: 'var(--tg-accent)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.5 3.5h1V9h-1V4.5zm.5 6.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z" /></svg>
               <span>{t('source.browserNotice')}</span>
             </div>
 
@@ -546,7 +570,7 @@ export default function Home() {
                     onMouseLeave={e => { e.currentTarget.style.background = 'rgba(48,209,88,0.15)'; e.currentTarget.style.borderColor = 'rgba(48,209,88,0.3)'; }}
                   >
                     <svg style={{ width: 11, height: 11 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                      <path d="M8 2v9M4 8l4 4 4-4M2 13h12"/>
+                      <path d="M8 2v9M4 8l4 4 4-4M2 13h12" />
                     </svg>
                     {t('status.download')}
                   </button>
@@ -589,6 +613,9 @@ export default function Home() {
 
       {/* Help modal */}
       {showHelp && <HowToUseModal onClose={() => setShowHelp(false)} />}
+
+      {/* Onboarding wizard (first visit only) */}
+      {mounted && showOnboarding && <OnboardingWizard onClose={dismissOnboarding} />}
     </div>
   );
 }
