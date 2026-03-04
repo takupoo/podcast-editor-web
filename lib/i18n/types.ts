@@ -84,6 +84,8 @@ export interface Translations {
       title: string;
       desc: string;
       denoiseAlgorithm: string;
+      rnnoise: string;
+      rnnoiseDesc: string;
       spectral: string;
       spectralDesc: string;
       afftdn: string;

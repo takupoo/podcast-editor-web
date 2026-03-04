@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: ProcessConfig = {
 
   // Stage 2: Denoise
   denoise_enabled: true,  // デフォルトON
-  denoise_method: 'spectral', // デフォルト: スペクトル減算（推奨）
+  denoise_method: 'rnnoise', // デフォルト: RNNoise（推奨）
   noise_gate_threshold: -50.0, // ノイズフロア閾値（-60～-30dB）
 
   // Stage 3: Loudness
@@ -22,9 +22,9 @@ export const DEFAULT_CONFIG: ProcessConfig = {
 
   // Stage 4: Dynamics
   comp_threshold: '-20dB',
-  comp_ratio: 4,
-  comp_attack: 5,
-  comp_release: 50,
+  comp_ratio: 3,
+  comp_attack: 15,
+  comp_release: 100,
   limiter_limit: '-1dB',
 
   // Stage 5-6: Mix

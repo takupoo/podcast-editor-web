@@ -104,14 +104,14 @@ export async function applySyncAndTrim(
   await execFF(ffmpeg, [
     '-y', '-t', CLAP_DETECT_DURATION.toString(),
     '-i', 'input_a.mp3',
-    '-ac', '1', '-ar', '44100',
+    '-ac', '1', '-ar', '48000',
     'detect_a.wav',
   ], 'Detect:A');
 
   await execFF(ffmpeg, [
     '-y', '-t', CLAP_DETECT_DURATION.toString(),
     '-i', 'input_b.mp3',
-    '-ac', '1', '-ar', '44100',
+    '-ac', '1', '-ar', '48000',
     'detect_b.wav',
   ], 'Detect:B');
 
@@ -145,12 +145,12 @@ export async function applySyncAndTrim(
   // FFmpegでトリム実行（WAV形式、モノラル、サンプルレート削減でメモリ節約）
   await execFF(ffmpeg, [
     '-y', '-ss', cutA.toFixed(3), '-i', 'input_a.mp3',
-    '-ac', '1', '-ar', '44100', outputA,
+    '-ac', '1', '-ar', '48000', outputA,
   ], 'Trim:A');
 
   await execFF(ffmpeg, [
     '-y', '-ss', cutB.toFixed(3), '-i', 'input_b.mp3',
-    '-ac', '1', '-ar', '44100', outputB,
+    '-ac', '1', '-ar', '48000', outputB,
   ], 'Trim:B');
 
   console.log('[Trim] トリム完了');

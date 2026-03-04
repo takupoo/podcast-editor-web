@@ -169,7 +169,7 @@ export async function processPodcast(
     // Stage 2-4: 統合処理（Denoise + Loudness + Dynamics）
     // spectral 以外の場合は3つのステージを1つのFFmpegコマンドにまとめて高速化
     const canUseUnified = !config.denoise_enabled ||
-                         (config.denoise_method !== 'spectral' && config.denoise_method !== 'anlmdn');
+                         (config.denoise_method !== 'spectral' && config.denoise_method !== 'anlmdn' && config.denoise_method !== 'rnnoise');
 
     if (canUseUnified) {
       // 統合処理パス（afftdn, none の場合）
@@ -188,10 +188,10 @@ export async function processPodcast(
         filterParts.push(
           'highpass=f=80',
           `afftdn=nr=${nr}:nf=-25:tn=1`,
-          'lowpass=f=12000'
+          'lowpass=f=16000'
         );
       } else if (config.denoise_enabled && config.denoise_method === 'none') {
-        filterParts.push('highpass=f=80', 'lowpass=f=12000');
+        filterParts.push('highpass=f=80', 'lowpass=f=16000');
       }
 
       // Loudness（単パス）
@@ -207,7 +207,7 @@ export async function processPodcast(
       const thresholdLinear = dbToLinear(config.comp_threshold);
       const limitLinear = dbToLinear(config.limiter_limit);
       filterParts.push(
-        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}`,
+        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=10`,
         `alimiter=limit=${limitLinear}`
       );
 

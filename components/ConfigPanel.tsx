@@ -154,7 +154,7 @@ export function ProcessingSection() {
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.denoiseAlgorithm')}</GrpHeader>
         <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(['spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
+          {(['rnnoise', 'spectral', 'afftdn', 'anlmdn', 'none'] as const).map(method => (
             <label
               key={method}
               style={{
@@ -175,12 +175,14 @@ export function ProcessingSection() {
               />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--tg-t1)' }}>
+                  {method === 'rnnoise' && t('config.processing.rnnoise')}
                   {method === 'spectral' && t('config.processing.spectral')}
                   {method === 'afftdn' && t('config.processing.afftdn')}
                   {method === 'anlmdn' && t('config.processing.anlmdn')}
                   {method === 'none' && t('config.processing.none')}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--tg-t3)', marginTop: 2 }}>
+                  {method === 'rnnoise' && t('config.processing.rnnoiseDesc')}
                   {method === 'spectral' && t('config.processing.spectralDesc')}
                   {method === 'afftdn' && t('config.processing.afftdnDesc')}
                   {method === 'anlmdn' && t('config.processing.anlmdnDesc')}

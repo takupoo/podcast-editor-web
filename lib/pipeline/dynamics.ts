@@ -33,7 +33,7 @@ export async function applyDynamics(
 
   console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}, limit=${limiterLimit}→${limitLinear.toFixed(4)}`);
 
-  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease},alimiter=limit=${limitLinear}`;
+  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=10,alimiter=limit=${limitLinear}`;
 
   await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', af, outputFile], 'Dynamics');
 

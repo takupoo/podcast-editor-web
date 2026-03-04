@@ -31,7 +31,7 @@ export const LEVEL_MAPPINGS: Record<string, LevelMapping> = {
   comp_ratio: {
     configKey: 'comp_ratio',
     // L1: 軽い圧縮 → L5: 強い圧縮
-    levels: [2, 3, 4, 6, 8],
+    levels: [1.5, 2, 3, 4, 6],
     unit: ':1',
     direction: 'stronger',
   },

@@ -14,7 +14,7 @@ export async function applyDenoise(
   ffmpeg: FFmpeg,
   inputFile: string,
   outputFile: string,
-  method: 'none' | 'afftdn' | 'anlmdn' | 'spectral' = 'spectral',
+  method: 'none' | 'afftdn' | 'anlmdn' | 'spectral' | 'rnnoise' = 'rnnoise',
   threshold: number = -50.0
 ): Promise<void> {
   console.log(`[Denoise] ノイズ除去開始: ${inputFile}`);
@@ -71,6 +71,106 @@ export async function applyDenoise(
       const basicFilter = ['highpass=f=80', 'lowpass=f=16000'].join(',');
       await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', basicFilter, outputFile], 'Denoise:basic');
     }
+    return;
+  }
+
+  if (method === 'rnnoise') {
+    // 方式5: RNNoise WASM（ニューラルネットワークベースのノイズ除去）
+    // 48kHz必須・480サンプル/フレームで処理
+    console.log('[Denoise] rnnoise: RNNoise WASM ノイズ除去開始');
+
+    // WASM FSからWAVを読み取りWeb Audio APIでデコード
+    const data = await ffmpeg.readFile(inputFile) as Uint8Array;
+    const arrayBuffer = data.buffer.slice(
+      data.byteOffset,
+      data.byteOffset + data.byteLength
+    ) as ArrayBuffer;
+
+    const audioCtx = new AudioContext();
+    let audioBuf: AudioBuffer;
+    try {
+      audioBuf = await audioCtx.decodeAudioData(arrayBuffer);
+    } finally {
+      audioCtx.close();
+    }
+
+    console.log(`[Denoise] デコード完了: ${audioBuf.duration.toFixed(1)}s, ${audioBuf.sampleRate}Hz, ${audioBuf.numberOfChannels}ch`);
+
+    // 48kHzにリサンプリング（RNNoise必須要件）
+    let buf48k: AudioBuffer;
+    if (audioBuf.sampleRate !== 48000) {
+      console.log(`[Denoise] リサンプリング: ${audioBuf.sampleRate}Hz → 48000Hz`);
+      const offCtx = new OfflineAudioContext(
+        audioBuf.numberOfChannels,
+        Math.ceil(audioBuf.length * 48000 / audioBuf.sampleRate),
+        48000
+      );
+      const src = offCtx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(offCtx.destination);
+      src.start(0);
+      buf48k = await offCtx.startRendering();
+    } else {
+      buf48k = audioBuf;
+    }
+
+    // RNNoise WASMをロードして処理
+    const { Rnnoise } = await import('@shiguredo/rnnoise-wasm');
+    const rnnoise = await Rnnoise.load();
+
+    const FRAME_SIZE = rnnoise.frameSize; // 480 (10ms @ 48kHz)
+    const processedChannels: Float32Array[] = [];
+
+    for (let ch = 0; ch < buf48k.numberOfChannels; ch++) {
+      const input = buf48k.getChannelData(ch);
+      const output = new Float32Array(input.length);
+      const denoiseState = rnnoise.createDenoiseState();
+      const frame = new Float32Array(FRAME_SIZE);
+
+      for (let i = 0; i < input.length; i += FRAME_SIZE) {
+        const remaining = Math.min(FRAME_SIZE, input.length - i);
+        frame.fill(0);
+        // RNNoise expects PCM16 range (-32768 to 32767)
+        for (let j = 0; j < remaining; j++) {
+          frame[j] = input[i + j] * 32768;
+        }
+        denoiseState.processFrame(frame);
+        // Convert back to float32 range
+        for (let j = 0; j < remaining; j++) {
+          output[i + j] = frame[j] / 32768;
+        }
+      }
+
+      denoiseState.destroy();
+      processedChannels.push(output);
+    }
+
+    // ハイパス/ローパスフィルタはFFmpegで適用
+    // まずRNNoise結果をWAVに書き戻す
+    const offCtxOut = new OfflineAudioContext(
+      buf48k.numberOfChannels,
+      buf48k.length,
+      48000
+    );
+    const outBuf = offCtxOut.createBuffer(
+      buf48k.numberOfChannels,
+      buf48k.length,
+      48000
+    );
+    for (let ch = 0; ch < processedChannels.length; ch++) {
+      outBuf.getChannelData(ch).set(processedChannels[ch]);
+    }
+
+    const wavData = encodeWav(outBuf);
+    const tempFile = `rnnoise_temp_${outputFile}`;
+    await ffmpeg.writeFile(tempFile, wavData);
+
+    // highpass + lowpass フィルタを適用
+    const filter = ['highpass=f=80', 'lowpass=f=16000'].join(',');
+    await execFF(ffmpeg, ['-y', '-i', tempFile, '-af', filter, outputFile], 'Denoise:rnnoise:filter');
+    try { await ffmpeg.deleteFile(tempFile); } catch { /* ignore */ }
+
+    console.log('[Denoise] rnnoise完了');
     return;
   }
 
