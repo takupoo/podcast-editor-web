@@ -207,7 +207,7 @@ export async function processPodcast(
       const thresholdLinear = dbToLinear(config.comp_threshold);
       const limitLinear = dbToLinear(config.limiter_limit);
       filterParts.push(
-        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=10`,
+        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`,
         `alimiter=limit=${limitLinear}`
       );
 
