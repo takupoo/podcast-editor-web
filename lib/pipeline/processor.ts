@@ -305,7 +305,7 @@ export async function processPodcast(
       );
       await safeDelete(ffmpeg, currentFileB);
 
-      // Stage 4: Loudness正規化（2パス — 正確なラウドネス調整）
+      // Stage 4: Loudness正規化（単パス — 2パスはFFmpeg.wasmで不安定なため）
       onProgress({
         stage: 'loudness',
         percent: 50,
@@ -318,7 +318,7 @@ export async function processPodcast(
         config.target_lufs,
         config.true_peak,
         config.lra,
-        false // 2パス
+        true // 単パス（FFmpeg.wasmでは-f null -が不安定）
       );
       await safeDelete(ffmpeg, 'dyn_a.wav');
 
@@ -334,7 +334,7 @@ export async function processPodcast(
         config.target_lufs,
         config.true_peak,
         config.lra,
-        false // 2パス
+        true // 単パス（FFmpeg.wasmでは-f null -が不安定）
       );
       await safeDelete(ffmpeg, 'dyn_b.wav');
     }
