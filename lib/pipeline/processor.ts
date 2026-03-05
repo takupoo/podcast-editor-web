@@ -214,10 +214,21 @@ export async function processPodcast(
       const dynFilter = filterParts.join(',');
       console.log('[Processor] Denoise+Dynamics フィルタ:', dynFilter);
 
+      // dynaudnorm ウォームアップ対策: 冒頭にリバース音声を8秒パディング→処理後トリム
+      const WARMUP_SECS = 8;
+      const filterComplex = [
+        `[0]asplit=2[orig][forpad]`,
+        `[forpad]atrim=end=${WARMUP_SECS},areverse[warmup]`,
+        `[warmup][orig]concat=n=2:v=0:a=1[padded]`,
+        `[padded]${dynFilter}[processed]`,
+        `[processed]atrim=start=${WARMUP_SECS},asetpts=PTS-STARTPTS[out]`,
+      ].join(';');
+
       // 話者A: Denoise + Dynamics
       await execFF(ffmpeg, [
         '-y', '-i', currentFileA,
-        '-af', dynFilter,
+        '-filter_complex', filterComplex,
+        '-map', '[out]',
         '-ar', '48000',
         'dyn_a.wav',
       ], 'Unified:Dyn:A');
@@ -231,7 +242,8 @@ export async function processPodcast(
       });
       await execFF(ffmpeg, [
         '-y', '-i', currentFileB,
-        '-af', dynFilter,
+        '-filter_complex', filterComplex,
+        '-map', '[out]',
         '-ar', '48000',
         'dyn_b.wav',
       ], 'Unified:Dyn:B');

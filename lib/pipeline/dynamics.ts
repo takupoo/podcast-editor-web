@@ -32,12 +32,29 @@ export async function applyDynamics(
   console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}`);
 
   // acompressor: ピークを抑える → dynaudnorm: 静かな部分を持ち上げる
-  const af = [
+  // dynaudnorm は gausssize=15 × framelen=500ms ≒ 7.5秒のウォームアップが必要。
+  // 冒頭にリバース音声を8秒パディングして処理後にトリムすることで、
+  // 冒頭からフルゲインで正規化される。
+  const WARMUP_SECS = 8;
+  const dynamicsChain = [
     `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=8`,
     'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10',
   ].join(',');
 
-  await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', af, outputFile], 'Dynamics');
+  const filterComplex = [
+    `[0]asplit=2[orig][forpad]`,
+    `[forpad]atrim=end=${WARMUP_SECS},areverse[warmup]`,
+    `[warmup][orig]concat=n=2:v=0:a=1[padded]`,
+    `[padded]${dynamicsChain}[processed]`,
+    `[processed]atrim=start=${WARMUP_SECS},asetpts=PTS-STARTPTS[out]`,
+  ].join(';');
+
+  await execFF(ffmpeg, [
+    '-y', '-i', inputFile,
+    '-filter_complex', filterComplex,
+    '-map', '[out]',
+    outputFile,
+  ], 'Dynamics');
 
   console.log(`[Dynamics] 処理完了: ${outputFile}`);
 }
