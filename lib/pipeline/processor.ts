@@ -204,6 +204,13 @@ export async function processPodcast(
         `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`
       );
 
+      // dynaudnorm: 短い区間ごとに音量を均一化（静かな声を持ち上げる）
+      // acompressorはピークを抑えるだけで静かな部分を持ち上げないため、
+      // dynaudnormで区間ごとのゲイン調整を行う
+      filterParts.push(
+        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10'
+      );
+
       const dynFilter = filterParts.join(',');
       console.log('[Processor] Denoise+Dynamics フィルタ:', dynFilter);
 

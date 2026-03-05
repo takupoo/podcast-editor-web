@@ -31,7 +31,11 @@ export async function applyDynamics(
 
   console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}`);
 
-  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=8`;
+  // acompressor: ピークを抑える → dynaudnorm: 静かな部分を持ち上げる
+  const af = [
+    `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=8`,
+    'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10',
+  ].join(',');
 
   await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', af, outputFile], 'Dynamics');
 
