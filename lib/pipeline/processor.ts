@@ -208,7 +208,7 @@ export async function processPodcast(
       // acompressorはピークを抑えるだけで静かな部分を持ち上げないため、
       // dynaudnormで区間ごとのゲイン調整を行う
       filterParts.push(
-        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10'
+        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10:threshold=0.01'
       );
 
       const dynFilter = filterParts.join(',');
@@ -462,6 +462,27 @@ export async function processPodcast(
       await safeDelete(ffmpeg, prevFile);
       await safeDelete(ffmpeg, 'endscene.mp3');
       currentFile = 'with_endscene.wav';
+    }
+
+    // Stage 7.5: 最終マスタリング（BGM/エンドシーン追加後のラウドネス保証）
+    // BGMやエンドシーンを追加すると統合ラウドネスがずれるため、
+    // 単パス loudnorm で最終 LUFS/TP を保証する（2パスはブラウザフリーズリスクあり）
+    if (config.bgm || config.endscene) {
+      onProgress({
+        stage: 'loudness',
+        percent: 87,
+        message: '最終ラウドネスを調整中...',
+      });
+
+      const prevFile = currentFile;
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFile,
+        '-af', `loudnorm=I=${config.target_lufs}:TP=${config.true_peak}:LRA=${config.lra}`,
+        '-ar', '48000',
+        'mastered.wav',
+      ], 'Master:loudnorm');
+      await safeDelete(ffmpeg, prevFile);
+      currentFile = 'mastered.wav';
     }
 
     // Aborted() が発生していた場合: 出力ファイルを保存してFFmpegを再ロード

@@ -119,6 +119,8 @@ export async function normalizeLoudness(
     `measured_LRA=${stats.input_lra}`,
     `measured_TP=${stats.input_tp}`,
     `measured_thresh=${stats.input_thresh}`,
+    `offset=${stats.target_offset}`,
+    `linear=false`,
   ].join(':');
 
   console.log(`[Loudness] 正規化開始: ${inputFile} -> ${outputFile}`);
