@@ -106,7 +106,11 @@ export async function normalizeLoudness(
   const stats = await measureLoudness(ffmpeg, inputFile);
   console.log('[Loudness] 計測完了:', stats);
 
-  // Pass 2: 計測値を使って正確に調整
+  // Pass 2: 計測値を使って正確に調整（calibrated dynamic mode）
+  // linear=true は使わない: ピーク-ラウドネス比が大きい信号では
+  // TP制限により十分なゲインが掛けられず、目標LUFSに到達できないため。
+  // 計測値付き dynamic mode なら、ピークを抑えつつ静かな部分を持ち上げて
+  // 目標LUFSに正確に到達できる。
   const af = [
     `loudnorm=I=${targetLufs}`,
     `TP=${truePeak}`,
@@ -115,7 +119,6 @@ export async function normalizeLoudness(
     `measured_LRA=${stats.input_lra}`,
     `measured_TP=${stats.input_tp}`,
     `measured_thresh=${stats.input_thresh}`,
-    'linear=true',
   ].join(':');
 
   console.log(`[Loudness] 正規化開始: ${inputFile} -> ${outputFile}`);
