@@ -173,13 +173,13 @@ export async function processPodcast(
 
     if (canUseUnified) {
       // 統合処理パス（afftdn, none の場合）
+      // Step 1: Denoise + Dynamics（acompressor）
       onProgress({
         stage: 'processing',
         percent: 20,
-        message: '音声を処理中（統合フィルタ）...',
+        message: '音声を処理中（Denoise + Dynamics）...',
       });
 
-      // フィルタチェーンの構築
       const filterParts: string[] = [];
 
       // Denoise（有効な場合）
@@ -194,7 +194,7 @@ export async function processPodcast(
         filterParts.push('highpass=f=80', 'lowpass=f=16000');
       }
 
-      // Dynamics（loudnorm の前に適用）
+      // Dynamics（loudnorm の前段）
       const dbToLinear = (dbStr: string): number => {
         const db = parseFloat(dbStr.replace(/dB$/i, ''));
         return Math.pow(10, db / 20);
@@ -204,41 +204,64 @@ export async function processPodcast(
         `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`
       );
 
-      // Loudness normalization（最後に適用 — 内蔵 true peak limiter で十分なため alimiter 不要）
-      filterParts.push(
-        `loudnorm=I=${config.target_lufs}:TP=${config.true_peak}:LRA=${config.lra}`
-      );
+      const dynFilter = filterParts.join(',');
+      console.log('[Processor] Denoise+Dynamics フィルタ:', dynFilter);
 
-      const unifiedFilter = filterParts.join(',');
-      console.log('[Processor] 統合フィルタ:', unifiedFilter);
+      // 話者A: Denoise + Dynamics
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFileA,
+        '-af', dynFilter,
+        '-ar', '48000',
+        'dyn_a.wav',
+      ], 'Unified:Dyn:A');
+      await safeDelete(ffmpeg, currentFileA);
 
-      // 話者A
+      // 話者B: Denoise + Dynamics
       onProgress({
         stage: 'processing',
         percent: 30,
-        message: '話者Aを処理中...',
-      });
-      await execFF(ffmpeg, [
-        '-y', '-i', currentFileA,
-        '-af', unifiedFilter,
-        '-ar', '48000',
-        'processed_a.wav',
-      ], 'Unified:A');
-      await safeDelete(ffmpeg, currentFileA);
-
-      // 話者B
-      onProgress({
-        stage: 'processing',
-        percent: 50,
-        message: '話者Bを処理中...',
+        message: '話者Bを処理中（Denoise + Dynamics）...',
       });
       await execFF(ffmpeg, [
         '-y', '-i', currentFileB,
-        '-af', unifiedFilter,
+        '-af', dynFilter,
         '-ar', '48000',
-        'processed_b.wav',
-      ], 'Unified:B');
+        'dyn_b.wav',
+      ], 'Unified:Dyn:B');
       await safeDelete(ffmpeg, currentFileB);
+
+      // Step 2: 2パス Loudness normalization（正確なレベル一致のため）
+      onProgress({
+        stage: 'loudness',
+        percent: 40,
+        message: 'ラウドネスを調整中（話者A）...',
+      });
+      await normalizeLoudness(
+        ffmpeg,
+        'dyn_a.wav',
+        'processed_a.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        false // 2パス
+      );
+      await safeDelete(ffmpeg, 'dyn_a.wav');
+
+      onProgress({
+        stage: 'loudness',
+        percent: 55,
+        message: 'ラウドネスを調整中（話者B）...',
+      });
+      await normalizeLoudness(
+        ffmpeg,
+        'dyn_b.wav',
+        'processed_b.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        false // 2パス
+      );
+      await safeDelete(ffmpeg, 'dyn_b.wav');
     } else {
       // 従来の分離処理パス（spectral, anlmdn の場合）
       // Stage 2: Denoise（ノイズ除去）
@@ -305,7 +328,7 @@ export async function processPodcast(
       );
       await safeDelete(ffmpeg, currentFileB);
 
-      // Stage 4: Loudness正規化（単パス — 2パスはFFmpeg.wasmで不安定なため）
+      // Stage 4: Loudness正規化（2パス — 正確なレベル一致のため）
       onProgress({
         stage: 'loudness',
         percent: 50,
@@ -318,7 +341,7 @@ export async function processPodcast(
         config.target_lufs,
         config.true_peak,
         config.lra,
-        true // 単パス（FFmpeg.wasmでは-f null -が不安定）
+        false // 2パス
       );
       await safeDelete(ffmpeg, 'dyn_a.wav');
 
@@ -334,7 +357,7 @@ export async function processPodcast(
         config.target_lufs,
         config.true_peak,
         config.lra,
-        true // 単パス（FFmpeg.wasmでは-f null -が不安定）
+        false // 2パス
       );
       await safeDelete(ffmpeg, 'dyn_b.wav');
     }
