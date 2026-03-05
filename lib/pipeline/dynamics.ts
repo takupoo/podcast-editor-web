@@ -12,7 +12,8 @@ function dbToLinear(dbStr: string): number {
 }
 
 /**
- * コンプレッサー + ハードリミッターを適用
+ * コンプレッサーを適用（loudnorm の前段で使用）
+ * alimiter は不要（loudnorm 内蔵の true peak limiter で十分）
  */
 export async function applyDynamics(
   ffmpeg: FFmpeg,
@@ -22,18 +23,15 @@ export async function applyDynamics(
   compRatio: number = 4,
   compAttack: number = 5,
   compRelease: number = 50,
-  limiterLimit: string = '-1dB'
+  _limiterLimit?: string
 ): Promise<void> {
   console.log(`[Dynamics] 処理開始: ${inputFile}`);
 
-  // acompressor/alimiter はlinear値(0-1)が必要
-  // dB文字列の場合は変換する
   const thresholdLinear = dbToLinear(compThreshold);
-  const limitLinear = dbToLinear(limiterLimit);
 
-  console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}, limit=${limiterLimit}→${limitLinear.toFixed(4)}`);
+  console.log(`[Dynamics] threshold=${compThreshold}→${thresholdLinear.toFixed(4)}`);
 
-  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=8,alimiter=limit=${limitLinear}`;
+  const af = `acompressor=threshold=${thresholdLinear}:ratio=${compRatio}:attack=${compAttack}:release=${compRelease}:knee=8`;
 
   await execFF(ffmpeg, ['-y', '-i', inputFile, '-af', af, outputFile], 'Dynamics');
 

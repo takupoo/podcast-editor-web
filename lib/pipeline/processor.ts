@@ -194,21 +194,19 @@ export async function processPodcast(
         filterParts.push('highpass=f=80', 'lowpass=f=16000');
       }
 
-      // Loudness（単パス）
-      filterParts.push(
-        `loudnorm=I=${config.target_lufs}:TP=${config.true_peak}:LRA=${config.lra}`
-      );
-
-      // Dynamics
+      // Dynamics（loudnorm の前に適用）
       const dbToLinear = (dbStr: string): number => {
         const db = parseFloat(dbStr.replace(/dB$/i, ''));
         return Math.pow(10, db / 20);
       };
       const thresholdLinear = dbToLinear(config.comp_threshold);
-      const limitLinear = dbToLinear(config.limiter_limit);
       filterParts.push(
-        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`,
-        `alimiter=limit=${limitLinear}`
+        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`
+      );
+
+      // Loudness normalization（最後に適用 — 内蔵 true peak limiter で十分なため alimiter 不要）
+      filterParts.push(
+        `loudnorm=I=${config.target_lufs}:TP=${config.true_peak}:LRA=${config.lra}`
       );
 
       const unifiedFilter = filterParts.join(',');
@@ -274,73 +272,71 @@ export async function processPodcast(
         currentFileB = 'denoised_b.wav';
       }
 
-      // Stage 3: Loudness正規化（単パス）
-      onProgress({
-        stage: 'loudness',
-        percent: 30,
-        message: 'ラウドネスを調整中...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        currentFileA,
-        'loud_a.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        true // 常に単パス
-      );
-      await safeDelete(ffmpeg, currentFileA);
-
-      onProgress({
-        stage: 'loudness',
-        percent: 40,
-        message: 'ラウドネスを調整中...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        currentFileB,
-        'loud_b.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        true // 常に単パス
-      );
-      await safeDelete(ffmpeg, currentFileB);
-
-      // Stage 4: Dynamics処理
+      // Stage 3: Dynamics処理（loudnorm の前に適用）
       onProgress({
         stage: 'dynamics',
-        percent: 50,
+        percent: 30,
         message: 'ダイナミクスを処理中（話者A）...',
       });
       await applyDynamics(
         ffmpeg,
-        'loud_a.wav',
-        'processed_a.wav',
+        currentFileA,
+        'dyn_a.wav',
         config.comp_threshold,
         config.comp_ratio,
         config.comp_attack,
-        config.comp_release,
-        config.limiter_limit
+        config.comp_release
       );
-      await safeDelete(ffmpeg, 'loud_a.wav');
+      await safeDelete(ffmpeg, currentFileA);
 
       onProgress({
         stage: 'dynamics',
-        percent: 60,
+        percent: 40,
         message: 'ダイナミクスを処理中（話者B）...',
       });
       await applyDynamics(
         ffmpeg,
-        'loud_b.wav',
-        'processed_b.wav',
+        currentFileB,
+        'dyn_b.wav',
         config.comp_threshold,
         config.comp_ratio,
         config.comp_attack,
-        config.comp_release,
-        config.limiter_limit
+        config.comp_release
       );
-      await safeDelete(ffmpeg, 'loud_b.wav');
+      await safeDelete(ffmpeg, currentFileB);
+
+      // Stage 4: Loudness正規化（2パス — 正確なラウドネス調整）
+      onProgress({
+        stage: 'loudness',
+        percent: 50,
+        message: 'ラウドネスを調整中（話者A）...',
+      });
+      await normalizeLoudness(
+        ffmpeg,
+        'dyn_a.wav',
+        'processed_a.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        false // 2パス
+      );
+      await safeDelete(ffmpeg, 'dyn_a.wav');
+
+      onProgress({
+        stage: 'loudness',
+        percent: 60,
+        message: 'ラウドネスを調整中（話者B）...',
+      });
+      await normalizeLoudness(
+        ffmpeg,
+        'dyn_b.wav',
+        'processed_b.wav',
+        config.target_lufs,
+        config.true_peak,
+        config.lra,
+        false // 2パス
+      );
+      await safeDelete(ffmpeg, 'dyn_b.wav');
     }
 
     // Stage 5: ボイスミックス

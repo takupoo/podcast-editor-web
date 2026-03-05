@@ -68,6 +68,7 @@ export async function mixVoices(
 
   // モノラル入力をそのままamixでミックス
   // normalize=0: 音量を保持（Loudness/Dynamicsで既に調整済み）
+  // amix後にalimiterを追加（2声の加算によるクリッピング防止）
   await execFF(ffmpeg, [
     '-y',
     '-i',
@@ -75,7 +76,7 @@ export async function mixVoices(
     '-i',
     trackB,
     '-filter_complex',
-    '[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0',
+    '[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0,alimiter=limit=0.891',
     output,
   ], 'Mix:voices');
 
