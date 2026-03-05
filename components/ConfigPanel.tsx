@@ -234,11 +234,35 @@ export function ProcessingSection() {
             />
           }
         />
+        <Row
+          label={t('config.processing.lra')}
+          hint={t('config.processing.lraHint')}
+          right={
+            <SliderRow
+              id="lra" min={5} max={15} step={1}
+              value={config.lra}
+              onChange={v => updateConfig({ lra: v })}
+              valueLabel={`${config.lra} LU`}
+            />
+          }
+        />
       </div>
 
       {/* Dynamics */}
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.dynamics')}</GrpHeader>
+        <Row
+          label={t('config.processing.compThreshold')}
+          hint={t('config.processing.compThresholdHint')}
+          right={
+            <SliderRow
+              id="comp-threshold" min={-40} max={-10} step={1}
+              value={parseFloat(config.comp_threshold.replace(/dB$/i, ''))}
+              onChange={v => updateConfig({ comp_threshold: `${v}dB` })}
+              valueLabel={`${config.comp_threshold}`}
+            />
+          }
+        />
         <Row
           label={t('config.processing.ratio')}
           hint={t('config.processing.ratioHint')}

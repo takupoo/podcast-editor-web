@@ -99,7 +99,11 @@ export interface Translations {
       loudness: string;
       targetLoudness: string;
       targetLoudnessHint: string;
+      lra: string;
+      lraHint: string;
       dynamics: string;
+      compThreshold: string;
+      compThresholdHint: string;
       ratio: string;
       ratioHint: string;
       attack: string;

@@ -18,11 +18,11 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   // Stage 3: Loudness
   target_lufs: -16.0,
   true_peak: -1.5,
-  lra: 11.0,
+  lra: 7.0,
 
   // Stage 4: Dynamics
-  comp_threshold: '-20dB',
-  comp_ratio: 3,
+  comp_threshold: '-25dB',
+  comp_ratio: 4,
   comp_attack: 15,
   comp_release: 100,
   limiter_limit: '-1dB',
