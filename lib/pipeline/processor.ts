@@ -208,7 +208,7 @@ export async function processPodcast(
       // acompressorはピークを抑えるだけで静かな部分を持ち上げないため、
       // dynaudnormで区間ごとのゲイン調整を行う
       filterParts.push(
-        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10:threshold=0.01'
+        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10'
       );
 
       const dynFilter = filterParts.join(',');
