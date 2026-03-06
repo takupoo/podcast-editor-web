@@ -25,6 +25,13 @@ export interface ProcessConfig {
   highpass_freq: number;         // ハイパスフィルタ周波数 (Hz)
   lowpass_freq: number;          // ローパスフィルタ周波数 (Hz)
 
+  // Stage 2.5: Noise Gate (agate)
+  noise_gate_enabled: boolean;   // ノイズゲート ON/OFF
+  noise_gate_level: number;      // 閾値 (dB) — この音量以下を減衰
+  noise_gate_attack: number;     // ゲートが開く速度 (ms)
+  noise_gate_release: number;    // ゲートが閉じる速度 (ms)
+  noise_gate_range: number;      // 最大減衰量 (dB) — 0=完全無音, -20=20dB下げ
+
   // Stage 3: Loudness
   loudness_enabled: boolean;     // ラウドネス正規化 ON/OFF
   target_lufs: number;           // -16.0 LUFS（ポッドキャスト標準）

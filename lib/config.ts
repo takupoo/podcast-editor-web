@@ -17,6 +17,13 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   highpass_freq: 80,           // ハイパスフィルタ (Hz)
   lowpass_freq: 16000,         // ローパスフィルタ (Hz)
 
+  // Stage 2.5: Noise Gate (agate)
+  noise_gate_enabled: false,
+  noise_gate_level: -40,       // -40dB 以下を減衰（静かな環境向け）
+  noise_gate_attack: 5,        // 5ms（素早くゲート開放）
+  noise_gate_release: 100,     // 100ms（自然な減衰）
+  noise_gate_range: -20,       // 20dB 減衰（完全無音にはしない → 自然）
+
   // Stage 3: Loudness
   loudness_enabled: true,
   target_lufs: -16.0,

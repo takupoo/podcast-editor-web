@@ -194,6 +194,15 @@ export async function processPodcast(
         filterParts.push(`highpass=f=${config.highpass_freq}`, `lowpass=f=${config.lowpass_freq}`);
       }
 
+      // Noise Gate（有効な場合）
+      if (config.noise_gate_enabled) {
+        const thresholdLinear = Math.pow(10, config.noise_gate_level / 20);
+        const rangeLinear = Math.pow(10, config.noise_gate_range / 20);
+        filterParts.push(
+          `agate=threshold=${thresholdLinear}:attack=${config.noise_gate_attack}:release=${config.noise_gate_release}:range=${rangeLinear}`
+        );
+      }
+
       // Dynamics（loudnorm の前段）— dynamics_enabled が false なら全スキップ
       const needDynamics = config.dynamics_enabled;
       const needDynaudnorm = needDynamics && config.dynaudnorm_enabled;
@@ -353,6 +362,21 @@ export async function processPodcast(
 
         currentFileA = 'denoised_a.wav';
         currentFileB = 'denoised_b.wav';
+      }
+
+      // Stage 2.5: Noise Gate（有効な場合）
+      if (config.noise_gate_enabled) {
+        const thresholdLinear = Math.pow(10, config.noise_gate_level / 20);
+        const rangeLinear = Math.pow(10, config.noise_gate_range / 20);
+        const gateFilter = `agate=threshold=${thresholdLinear}:attack=${config.noise_gate_attack}:release=${config.noise_gate_release}:range=${rangeLinear}`;
+
+        const prevA = currentFileA, prevB = currentFileB;
+        await execFF(ffmpeg, ['-y', '-i', currentFileA, '-af', gateFilter, 'gated_a.wav'], 'Gate:A');
+        await safeDelete(ffmpeg, prevA);
+        await execFF(ffmpeg, ['-y', '-i', currentFileB, '-af', gateFilter, 'gated_b.wav'], 'Gate:B');
+        await safeDelete(ffmpeg, prevB);
+        currentFileA = 'gated_a.wav';
+        currentFileB = 'gated_b.wav';
       }
 
       // Stage 3: Dynamics処理（loudnorm の前に適用）

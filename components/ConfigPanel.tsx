@@ -232,6 +232,73 @@ export function ProcessingSection() {
         />
       </div>
 
+      {/* Noise Gate */}
+      <div className="tg-grp">
+        <GrpHeader>Noise Gate</GrpHeader>
+        <Row
+          label={t('config.enabled')}
+          hint="発話していない区間のノイズを減衰"
+          right={
+            <Switch
+              checked={config.noise_gate_enabled}
+              onCheckedChange={(v) => updateConfig({ noise_gate_enabled: v })}
+            />
+          }
+        />
+        {config.noise_gate_enabled && (
+          <>
+            <Row
+              label="Threshold"
+              hint="この音量以下を減衰 (dB)"
+              right={
+                <SliderRow
+                  id="noise-gate-level" min={-60} max={-20} step={1}
+                  value={config.noise_gate_level}
+                  onChange={v => updateConfig({ noise_gate_level: v })}
+                  valueLabel={`${config.noise_gate_level} dB`}
+                />
+              }
+            />
+            <Row
+              label="Attack"
+              hint="ゲートが開く速度"
+              right={
+                <SliderRow
+                  id="noise-gate-attack" min={1} max={50} step={1}
+                  value={config.noise_gate_attack}
+                  onChange={v => updateConfig({ noise_gate_attack: v })}
+                  valueLabel={`${config.noise_gate_attack} ms`}
+                />
+              }
+            />
+            <Row
+              label="Release"
+              hint="ゲートが閉じる速度"
+              right={
+                <SliderRow
+                  id="noise-gate-release" min={10} max={500} step={10}
+                  value={config.noise_gate_release}
+                  onChange={v => updateConfig({ noise_gate_release: v })}
+                  valueLabel={`${config.noise_gate_release} ms`}
+                />
+              }
+            />
+            <Row
+              label="Range"
+              hint="0=完全無音, -20=20dB減衰"
+              right={
+                <SliderRow
+                  id="noise-gate-range" min={-60} max={0} step={1}
+                  value={config.noise_gate_range}
+                  onChange={v => updateConfig({ noise_gate_range: v })}
+                  valueLabel={`${config.noise_gate_range} dB`}
+                />
+              }
+            />
+          </>
+        )}
+      </div>
+
       {/* Loudness */}
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.loudness')}</GrpHeader>
