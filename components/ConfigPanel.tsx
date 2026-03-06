@@ -206,6 +206,30 @@ export function ProcessingSection() {
             }
           />
         )}
+        <Row
+          label="Highpass"
+          hint="低域カット周波数"
+          right={
+            <SliderRow
+              id="highpass-freq" min={20} max={300} step={5}
+              value={config.highpass_freq}
+              onChange={v => updateConfig({ highpass_freq: v })}
+              valueLabel={`${config.highpass_freq} Hz`}
+            />
+          }
+        />
+        <Row
+          label="Lowpass"
+          hint="高域カット周波数"
+          right={
+            <SliderRow
+              id="lowpass-freq" min={8000} max={22000} step={500}
+              value={config.lowpass_freq}
+              onChange={v => updateConfig({ lowpass_freq: v })}
+              valueLabel={`${config.lowpass_freq} Hz`}
+            />
+          }
+        />
       </div>
 
       {/* Loudness */}
@@ -397,6 +421,23 @@ export function ProcessingSection() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Limiter（ボイスミックス後） */}
+      <div className="tg-grp">
+        <GrpHeader>Limiter</GrpHeader>
+        <Row
+          label="Limit"
+          hint="ミックス後のクリッピング防止上限"
+          right={
+            <SliderRow
+              id="limiter-limit" min={-3} max={0} step={0.1}
+              value={parseFloat(config.limiter_limit.replace(/dB$/i, ''))}
+              onChange={v => updateConfig({ limiter_limit: `${v}dB` })}
+              valueLabel={`${config.limiter_limit}`}
+            />
+          }
+        />
       </div>
     </div>
   );

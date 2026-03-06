@@ -62,9 +62,14 @@ export async function mixVoices(
   ffmpeg: FFmpeg,
   trackA: string,
   trackB: string,
-  output: string
+  output: string,
+  limiterLimit: string = '-1dB'
 ): Promise<void> {
   console.log(`[Mix] ボイスミックス開始: ${trackA} + ${trackB}`);
+
+  // dB文字列を線形値に変換（alimiterはlinear値が必要）
+  const db = parseFloat(limiterLimit.replace(/dB$/i, ''));
+  const limitLinear = Math.pow(10, db / 20);
 
   // モノラル入力をそのままamixでミックス
   // normalize=0: 音量を保持（Loudness/Dynamicsで既に調整済み）
@@ -76,7 +81,7 @@ export async function mixVoices(
     '-i',
     trackB,
     '-filter_complex',
-    '[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0,alimiter=limit=0.891',
+    `[0:a][1:a]amix=inputs=2:duration=shortest:normalize=0,alimiter=limit=${limitLinear.toFixed(4)}`,
     output,
   ], 'Mix:voices');
 

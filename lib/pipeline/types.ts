@@ -22,6 +22,8 @@ export interface ProcessConfig {
   denoise_enabled: boolean;
   denoise_method: 'none' | 'afftdn' | 'anlmdn' | 'spectral' | 'rnnoise'; // ノイズ除去方式
   noise_gate_threshold: number;  // ノイズフロア閾値（dB）
+  highpass_freq: number;         // ハイパスフィルタ周波数 (Hz)
+  lowpass_freq: number;          // ローパスフィルタ周波数 (Hz)
 
   // Stage 3: Loudness
   loudness_enabled: boolean;     // ラウドネス正規化 ON/OFF

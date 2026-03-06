@@ -186,12 +186,12 @@ export async function processPodcast(
       if (config.denoise_enabled && config.denoise_method === 'afftdn') {
         const nr = Math.round(Math.max(10, Math.min(80, ((-config.noise_gate_threshold - 30) / 10) * 23.3)));
         filterParts.push(
-          'highpass=f=80',
+          `highpass=f=${config.highpass_freq}`,
           `afftdn=nr=${nr}:nf=-25:tn=1`,
-          'lowpass=f=16000'
+          `lowpass=f=${config.lowpass_freq}`
         );
       } else if (config.denoise_enabled && config.denoise_method === 'none') {
-        filterParts.push('highpass=f=80', 'lowpass=f=16000');
+        filterParts.push(`highpass=f=${config.highpass_freq}`, `lowpass=f=${config.lowpass_freq}`);
       }
 
       // Dynamics（loudnorm の前段）— dynamics_enabled が false なら全スキップ
@@ -334,7 +334,9 @@ export async function processPodcast(
           currentFileA,
           'denoised_a.wav',
           config.denoise_method,
-          config.noise_gate_threshold
+          config.noise_gate_threshold,
+          config.highpass_freq,
+          config.lowpass_freq
         );
         await safeDelete(ffmpeg, prevA);
 
@@ -343,7 +345,9 @@ export async function processPodcast(
           currentFileB,
           'denoised_b.wav',
           config.denoise_method,
-          config.noise_gate_threshold
+          config.noise_gate_threshold,
+          config.highpass_freq,
+          config.lowpass_freq
         );
         await safeDelete(ffmpeg, prevB);
 
@@ -453,7 +457,7 @@ export async function processPodcast(
       percent: 70,
       message: '2トラックをミックス中...',
     });
-    await mixVoices(ffmpeg, 'processed_a.wav', 'processed_b.wav', 'mixed.wav');
+    await mixVoices(ffmpeg, 'processed_a.wav', 'processed_b.wav', 'mixed.wav', config.limiter_limit);
     await safeDelete(ffmpeg, 'processed_a.wav');
     await safeDelete(ffmpeg, 'processed_b.wav');
 
@@ -542,17 +546,19 @@ export async function processPodcast(
       currentFile = 'with_endscene.wav';
     }
 
-    // Stage 7.5: 最終マスタリング（BGM/エンドシーン追加後のラウドネス・TP保証）
-    // 単パス loudnorm で最終 LUFS/TP を保証（2パスはブラウザフリーズリスクあり）
-    // ターゲットを +1 LU 補正: 単パス loudnorm は入力が目標付近だと控えめになるため
-    if (config.loudness_enabled && (config.bgm || config.endscene)) {
+    // Stage 7.5: 最終マスタリング（最終ミックス後のラウドネス・TP保証）
+    // 話者単位で loudnorm 済みでも、amix/BGM/エンドシーン追加後に最終LUFSは変動する。
+    // そのため loudness_enabled 時は常に最終段で単パス loudnorm を適用する。
+    // BGM/エンドシーンあり時のみ +1 LU 補正（単パスの控えめ傾向を補正）。
+    if (config.loudness_enabled) {
       onProgress({
         stage: 'loudness',
         percent: 87,
         message: '最終ラウドネスを調整中...',
       });
 
-      const masterTarget = config.target_lufs + 1.0;
+      const hasMixAssets = Boolean(config.bgm || config.endscene);
+      const masterTarget = hasMixAssets ? config.target_lufs + 1.0 : config.target_lufs;
       const prevFile = currentFile;
       await execFF(ffmpeg, [
         '-y', '-i', currentFile,

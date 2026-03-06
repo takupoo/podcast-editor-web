@@ -14,6 +14,8 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   denoise_enabled: true,  // デフォルトON
   denoise_method: 'rnnoise', // デフォルト: RNNoise（推奨）
   noise_gate_threshold: -50.0, // ノイズフロア閾値（-60～-30dB）
+  highpass_freq: 80,           // ハイパスフィルタ (Hz)
+  lowpass_freq: 16000,         // ローパスフィルタ (Hz)
 
   // Stage 3: Loudness
   loudness_enabled: true,
