@@ -476,6 +476,28 @@ export async function processPodcast(
       currentFile = 'with_endscene.wav';
     }
 
+    // Stage 7.5: 最終マスタリング（BGM/エンドシーン追加後のラウドネス・TP保証）
+    // 単パス loudnorm で最終 LUFS/TP を保証（2パスはブラウザフリーズリスクあり）
+    // ターゲットを +1 LU 補正: 単パス loudnorm は入力が目標付近だと控えめになるため
+    if (config.bgm || config.endscene) {
+      onProgress({
+        stage: 'loudness',
+        percent: 87,
+        message: '最終ラウドネスを調整中...',
+      });
+
+      const masterTarget = config.target_lufs + 1.0;
+      const prevFile = currentFile;
+      await execFF(ffmpeg, [
+        '-y', '-i', currentFile,
+        '-af', `loudnorm=I=${masterTarget}:TP=${config.true_peak}:LRA=${config.lra}`,
+        '-ar', '48000',
+        'mastered.wav',
+      ], 'Master:loudnorm');
+      await safeDelete(ffmpeg, prevFile);
+      currentFile = 'mastered.wav';
+    }
+
     // Aborted() が発生していた場合: 出力ファイルを保存してFFmpegを再ロード
     // appendEndscene の concat フィルタが WASM abort を引き起こすことがある
     // その場合、次の exec() が RuntimeError になるため事前にリロードが必要
