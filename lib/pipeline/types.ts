@@ -24,16 +24,26 @@ export interface ProcessConfig {
   noise_gate_threshold: number;  // ノイズフロア閾値（dB）
 
   // Stage 3: Loudness
+  loudness_enabled: boolean;     // ラウドネス正規化 ON/OFF
   target_lufs: number;           // -16.0 LUFS（ポッドキャスト標準）
   true_peak: number;             // -1.5 dBTP
   lra: number;                   // 11.0 LU
 
   // Stage 4: Dynamics
+  dynamics_enabled: boolean;     // ダイナミクス処理全体 ON/OFF
   comp_threshold: string;        // '-20dB'
   comp_ratio: number;            // 4:1
   comp_attack: number;           // ms
   comp_release: number;          // ms
+  comp_knee: number;             // knee (dB)
   limiter_limit: string;         // '-1dB'
+
+  // dynaudnorm
+  dynaudnorm_enabled: boolean;   // dynaudnorm 単体 ON/OFF
+  dynaudnorm_framelen: number;   // フレーム長 (ms)
+  dynaudnorm_gausssize: number;  // ガウス窓サイズ（奇数）
+  dynaudnorm_peak: number;       // ターゲットピーク (0-1)
+  dynaudnorm_maxgain: number;    // 最大ゲイン (dB)
 
   // Stage 5-6: Mix
   bgm?: string | File;           // BGMファイルパスまたはFileオブジェクト（非永続化）

@@ -194,93 +194,130 @@ export async function processPodcast(
         filterParts.push('highpass=f=80', 'lowpass=f=16000');
       }
 
-      // Dynamics（loudnorm の前段）
-      const dbToLinear = (dbStr: string): number => {
-        const db = parseFloat(dbStr.replace(/dB$/i, ''));
-        return Math.pow(10, db / 20);
-      };
-      const thresholdLinear = dbToLinear(config.comp_threshold);
-      filterParts.push(
-        `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=8`
-      );
+      // Dynamics（loudnorm の前段）— dynamics_enabled が false なら全スキップ
+      const needDynamics = config.dynamics_enabled;
+      const needDynaudnorm = needDynamics && config.dynaudnorm_enabled;
 
-      // dynaudnorm: 短い区間ごとに音量を均一化（静かな声を持ち上げる）
-      // acompressorはピークを抑えるだけで静かな部分を持ち上げないため、
-      // dynaudnormで区間ごとのゲイン調整を行う
-      filterParts.push(
-        'dynaudnorm=framelen=500:gausssize=15:peak=0.9:maxgain=10'
-      );
+      if (needDynamics) {
+        const dbToLinear = (dbStr: string): number => {
+          const db = parseFloat(dbStr.replace(/dB$/i, ''));
+          return Math.pow(10, db / 20);
+        };
+        const thresholdLinear = dbToLinear(config.comp_threshold);
+        filterParts.push(
+          `acompressor=threshold=${thresholdLinear}:ratio=${config.comp_ratio}:attack=${config.comp_attack}:release=${config.comp_release}:knee=${config.comp_knee}`
+        );
 
-      const dynFilter = filterParts.join(',');
-      console.log('[Processor] Denoise+Dynamics フィルタ:', dynFilter);
+        if (needDynaudnorm) {
+          filterParts.push(
+            `dynaudnorm=framelen=${config.dynaudnorm_framelen}:gausssize=${config.dynaudnorm_gausssize}:peak=${config.dynaudnorm_peak}:maxgain=${config.dynaudnorm_maxgain}`
+          );
+        }
+      }
 
-      // dynaudnorm ウォームアップ対策: 冒頭にリバース音声を8秒パディング→処理後トリム
-      const WARMUP_SECS = 8;
-      const filterComplex = [
-        `[0]asplit=2[orig][forpad]`,
-        `[forpad]atrim=end=${WARMUP_SECS},areverse[warmup]`,
-        `[warmup][orig]concat=n=2:v=0:a=1[padded]`,
-        `[padded]${dynFilter}[processed]`,
-        `[processed]atrim=start=${WARMUP_SECS},asetpts=PTS-STARTPTS[out]`,
-      ].join(';');
+      // フィルタが空の場合（denoise OFF + dynamics OFF）はコピーのみ
+      if (filterParts.length === 0) {
+        // 何もフィルタがない場合はそのままコピー
+        await execFF(ffmpeg, ['-y', '-i', currentFileA, '-ar', '48000', 'dyn_a.wav'], 'Unified:Copy:A');
+        await safeDelete(ffmpeg, currentFileA);
+        onProgress({ stage: 'processing', percent: 30, message: '話者Bを処理中...' });
+        await execFF(ffmpeg, ['-y', '-i', currentFileB, '-ar', '48000', 'dyn_b.wav'], 'Unified:Copy:B');
+        await safeDelete(ffmpeg, currentFileB);
+      } else if (needDynaudnorm) {
+        // dynaudnorm ON: warmup パディング付き complex filtergraph
+        const dynFilter = filterParts.join(',');
+        console.log('[Processor] Denoise+Dynamics フィルタ:', dynFilter);
 
-      // 話者A: Denoise + Dynamics
-      await execFF(ffmpeg, [
-        '-y', '-i', currentFileA,
-        '-filter_complex', filterComplex,
-        '-map', '[out]',
-        '-ar', '48000',
-        'dyn_a.wav',
-      ], 'Unified:Dyn:A');
-      await safeDelete(ffmpeg, currentFileA);
+        const WARMUP_SECS = 8;
+        const filterComplex = [
+          `[0]asplit=2[orig][forpad]`,
+          `[forpad]atrim=end=${WARMUP_SECS},areverse[warmup]`,
+          `[warmup][orig]concat=n=2:v=0:a=1[padded]`,
+          `[padded]${dynFilter}[processed]`,
+          `[processed]atrim=start=${WARMUP_SECS},asetpts=PTS-STARTPTS[out]`,
+        ].join(';');
 
-      // 話者B: Denoise + Dynamics
-      onProgress({
-        stage: 'processing',
-        percent: 30,
-        message: '話者Bを処理中（Denoise + Dynamics）...',
-      });
-      await execFF(ffmpeg, [
-        '-y', '-i', currentFileB,
-        '-filter_complex', filterComplex,
-        '-map', '[out]',
-        '-ar', '48000',
-        'dyn_b.wav',
-      ], 'Unified:Dyn:B');
-      await safeDelete(ffmpeg, currentFileB);
+        await execFF(ffmpeg, [
+          '-y', '-i', currentFileA,
+          '-filter_complex', filterComplex,
+          '-map', '[out]',
+          '-ar', '48000',
+          'dyn_a.wav',
+        ], 'Unified:Dyn:A');
+        await safeDelete(ffmpeg, currentFileA);
+
+        onProgress({ stage: 'processing', percent: 30, message: '話者Bを処理中（Denoise + Dynamics）...' });
+        await execFF(ffmpeg, [
+          '-y', '-i', currentFileB,
+          '-filter_complex', filterComplex,
+          '-map', '[out]',
+          '-ar', '48000',
+          'dyn_b.wav',
+        ], 'Unified:Dyn:B');
+        await safeDelete(ffmpeg, currentFileB);
+      } else {
+        // dynaudnorm OFF: 単純な -af（warmup 不要）
+        const dynFilter = filterParts.join(',');
+        console.log('[Processor] Denoise+Dynamics フィルタ (no dynaudnorm):', dynFilter);
+
+        await execFF(ffmpeg, [
+          '-y', '-i', currentFileA,
+          '-af', dynFilter,
+          '-ar', '48000',
+          'dyn_a.wav',
+        ], 'Unified:Dyn:A');
+        await safeDelete(ffmpeg, currentFileA);
+
+        onProgress({ stage: 'processing', percent: 30, message: '話者Bを処理中（Denoise + Dynamics）...' });
+        await execFF(ffmpeg, [
+          '-y', '-i', currentFileB,
+          '-af', dynFilter,
+          '-ar', '48000',
+          'dyn_b.wav',
+        ], 'Unified:Dyn:B');
+        await safeDelete(ffmpeg, currentFileB);
+      }
 
       // Step 2: 2パス Loudness normalization（正確なレベル一致のため）
-      onProgress({
-        stage: 'loudness',
-        percent: 40,
-        message: 'ラウドネスを調整中（話者A）...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        'dyn_a.wav',
-        'processed_a.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        false // 2パス
-      );
-      await safeDelete(ffmpeg, 'dyn_a.wav');
+      if (config.loudness_enabled) {
+        onProgress({
+          stage: 'loudness',
+          percent: 40,
+          message: 'ラウドネスを調整中（話者A）...',
+        });
+        await normalizeLoudness(
+          ffmpeg,
+          'dyn_a.wav',
+          'processed_a.wav',
+          config.target_lufs,
+          config.true_peak,
+          config.lra,
+          false // 2パス
+        );
+        await safeDelete(ffmpeg, 'dyn_a.wav');
 
-      onProgress({
-        stage: 'loudness',
-        percent: 55,
-        message: 'ラウドネスを調整中（話者B）...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        'dyn_b.wav',
-        'processed_b.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        false // 2パス
-      );
-      await safeDelete(ffmpeg, 'dyn_b.wav');
+        onProgress({
+          stage: 'loudness',
+          percent: 55,
+          message: 'ラウドネスを調整中（話者B）...',
+        });
+        await normalizeLoudness(
+          ffmpeg,
+          'dyn_b.wav',
+          'processed_b.wav',
+          config.target_lufs,
+          config.true_peak,
+          config.lra,
+          false // 2パス
+        );
+        await safeDelete(ffmpeg, 'dyn_b.wav');
+      } else {
+        // loudness OFF: リネームのみ
+        await execFF(ffmpeg, ['-y', '-i', 'dyn_a.wav', '-c', 'copy', 'processed_a.wav'], 'Copy:A');
+        await safeDelete(ffmpeg, 'dyn_a.wav');
+        await execFF(ffmpeg, ['-y', '-i', 'dyn_b.wav', '-c', 'copy', 'processed_b.wav'], 'Copy:B');
+        await safeDelete(ffmpeg, 'dyn_b.wav');
+      }
     } else {
       // 従来の分離処理パス（spectral, anlmdn の場合）
       // Stage 2: Denoise（ノイズ除去）
@@ -315,70 +352,99 @@ export async function processPodcast(
       }
 
       // Stage 3: Dynamics処理（loudnorm の前に適用）
-      onProgress({
-        stage: 'dynamics',
-        percent: 30,
-        message: 'ダイナミクスを処理中（話者A）...',
-      });
-      await applyDynamics(
-        ffmpeg,
-        currentFileA,
-        'dyn_a.wav',
-        config.comp_threshold,
-        config.comp_ratio,
-        config.comp_attack,
-        config.comp_release
-      );
-      await safeDelete(ffmpeg, currentFileA);
+      if (config.dynamics_enabled) {
+        onProgress({
+          stage: 'dynamics',
+          percent: 30,
+          message: 'ダイナミクスを処理中（話者A）...',
+        });
+        await applyDynamics(
+          ffmpeg,
+          currentFileA,
+          'dyn_a.wav',
+          {
+            compThreshold: config.comp_threshold,
+            compRatio: config.comp_ratio,
+            compAttack: config.comp_attack,
+            compRelease: config.comp_release,
+            compKnee: config.comp_knee,
+            dynaudnormEnabled: config.dynaudnorm_enabled,
+            dynaudnormFramelen: config.dynaudnorm_framelen,
+            dynaudnormGausssize: config.dynaudnorm_gausssize,
+            dynaudnormPeak: config.dynaudnorm_peak,
+            dynaudnormMaxgain: config.dynaudnorm_maxgain,
+          }
+        );
+        await safeDelete(ffmpeg, currentFileA);
 
-      onProgress({
-        stage: 'dynamics',
-        percent: 40,
-        message: 'ダイナミクスを処理中（話者B）...',
-      });
-      await applyDynamics(
-        ffmpeg,
-        currentFileB,
-        'dyn_b.wav',
-        config.comp_threshold,
-        config.comp_ratio,
-        config.comp_attack,
-        config.comp_release
-      );
-      await safeDelete(ffmpeg, currentFileB);
+        onProgress({
+          stage: 'dynamics',
+          percent: 40,
+          message: 'ダイナミクスを処理中（話者B）...',
+        });
+        await applyDynamics(
+          ffmpeg,
+          currentFileB,
+          'dyn_b.wav',
+          {
+            compThreshold: config.comp_threshold,
+            compRatio: config.comp_ratio,
+            compAttack: config.comp_attack,
+            compRelease: config.comp_release,
+            compKnee: config.comp_knee,
+            dynaudnormEnabled: config.dynaudnorm_enabled,
+            dynaudnormFramelen: config.dynaudnorm_framelen,
+            dynaudnormGausssize: config.dynaudnorm_gausssize,
+            dynaudnormPeak: config.dynaudnorm_peak,
+            dynaudnormMaxgain: config.dynaudnorm_maxgain,
+          }
+        );
+        await safeDelete(ffmpeg, currentFileB);
+
+        currentFileA = 'dyn_a.wav';
+        currentFileB = 'dyn_b.wav';
+      }
 
       // Stage 4: Loudness正規化（2パス — 正確なレベル一致のため）
-      onProgress({
-        stage: 'loudness',
-        percent: 50,
-        message: 'ラウドネスを調整中（話者A）...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        'dyn_a.wav',
-        'processed_a.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        false // 2パス
-      );
-      await safeDelete(ffmpeg, 'dyn_a.wav');
+      if (config.loudness_enabled) {
+        onProgress({
+          stage: 'loudness',
+          percent: 50,
+          message: 'ラウドネスを調整中（話者A）...',
+        });
+        await normalizeLoudness(
+          ffmpeg,
+          currentFileA,
+          'processed_a.wav',
+          config.target_lufs,
+          config.true_peak,
+          config.lra,
+          false // 2パス
+        );
+        await safeDelete(ffmpeg, currentFileA);
 
-      onProgress({
-        stage: 'loudness',
-        percent: 60,
-        message: 'ラウドネスを調整中（話者B）...',
-      });
-      await normalizeLoudness(
-        ffmpeg,
-        'dyn_b.wav',
-        'processed_b.wav',
-        config.target_lufs,
-        config.true_peak,
-        config.lra,
-        false // 2パス
-      );
-      await safeDelete(ffmpeg, 'dyn_b.wav');
+        onProgress({
+          stage: 'loudness',
+          percent: 60,
+          message: 'ラウドネスを調整中（話者B）...',
+        });
+        await normalizeLoudness(
+          ffmpeg,
+          currentFileB,
+          'processed_b.wav',
+          config.target_lufs,
+          config.true_peak,
+          config.lra,
+          false // 2パス
+        );
+        await safeDelete(ffmpeg, currentFileB);
+      } else {
+        // loudness OFF: そのままコピー
+        await execFF(ffmpeg, ['-y', '-i', currentFileA, '-c', 'copy', 'processed_a.wav'], 'Copy:A');
+        await safeDelete(ffmpeg, currentFileA);
+        await execFF(ffmpeg, ['-y', '-i', currentFileB, '-c', 'copy', 'processed_b.wav'], 'Copy:B');
+        await safeDelete(ffmpeg, currentFileB);
+      }
     }
 
     // Stage 5: ボイスミックス
@@ -479,7 +545,7 @@ export async function processPodcast(
     // Stage 7.5: 最終マスタリング（BGM/エンドシーン追加後のラウドネス・TP保証）
     // 単パス loudnorm で最終 LUFS/TP を保証（2パスはブラウザフリーズリスクあり）
     // ターゲットを +1 LU 補正: 単パス loudnorm は入力が目標付近だと控えめになるため
-    if (config.bgm || config.endscene) {
+    if (config.loudness_enabled && (config.bgm || config.endscene)) {
       onProgress({
         stage: 'loudness',
         percent: 87,

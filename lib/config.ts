@@ -16,16 +16,26 @@ export const DEFAULT_CONFIG: ProcessConfig = {
   noise_gate_threshold: -50.0, // ノイズフロア閾値（-60～-30dB）
 
   // Stage 3: Loudness
+  loudness_enabled: true,
   target_lufs: -16.0,
   true_peak: -1.5,
   lra: 7.0,
 
   // Stage 4: Dynamics
+  dynamics_enabled: true,
   comp_threshold: '-25dB',
   comp_ratio: 4,
   comp_attack: 15,
   comp_release: 100,
+  comp_knee: 8,
   limiter_limit: '-1dB',
+
+  // dynaudnorm
+  dynaudnorm_enabled: true,
+  dynaudnorm_framelen: 500,
+  dynaudnorm_gausssize: 15,
+  dynaudnorm_peak: 0.9,
+  dynaudnorm_maxgain: 10,
 
   // Stage 5-6: Mix
   bgm_target_lufs: -44.0,

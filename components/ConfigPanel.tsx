@@ -198,7 +198,7 @@ export function ProcessingSection() {
             hint={t('config.processing.noiseFloorHint')}
             right={
               <SliderRow
-                id="noise-gate-threshold" min={-60} max={-30} step={5}
+                id="noise-gate-threshold" min={-60} max={-30} step={1}
                 value={config.noise_gate_threshold}
                 onChange={v => updateConfig({ noise_gate_threshold: v })}
                 valueLabel={`${config.noise_gate_threshold} dB`}
@@ -212,91 +212,191 @@ export function ProcessingSection() {
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.loudness')}</GrpHeader>
         <Row
-          label={t('config.processing.targetLoudness')}
-          hint={t('config.processing.targetLoudnessHint')}
+          label={t('config.enabled')}
           right={
-            <SliderRow
-              id="target-lufs" min={-20} max={-12} step={0.5}
-              value={config.target_lufs}
-              onChange={v => updateConfig({ target_lufs: v })}
-              valueLabel={`${config.target_lufs} LUFS`}
+            <Switch
+              checked={config.loudness_enabled}
+              onCheckedChange={(v) => updateConfig({ loudness_enabled: v })}
             />
           }
         />
-        <Row
-          label="True Peak"
-          right={
-            <SliderRow
-              id="true-peak" min={-3} max={0} step={0.5}
-              value={config.true_peak}
-              onChange={v => updateConfig({ true_peak: v })}
-              valueLabel={`${config.true_peak} dBTP`}
+        {config.loudness_enabled && (
+          <>
+            <Row
+              label={t('config.processing.targetLoudness')}
+              hint={t('config.processing.targetLoudnessHint')}
+              right={
+                <SliderRow
+                  id="target-lufs" min={-20} max={-12} step={0.5}
+                  value={config.target_lufs}
+                  onChange={v => updateConfig({ target_lufs: v })}
+                  valueLabel={`${config.target_lufs} LUFS`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.processing.lra')}
-          hint={t('config.processing.lraHint')}
-          right={
-            <SliderRow
-              id="lra" min={5} max={15} step={1}
-              value={config.lra}
-              onChange={v => updateConfig({ lra: v })}
-              valueLabel={`${config.lra} LU`}
+            <Row
+              label="True Peak"
+              right={
+                <SliderRow
+                  id="true-peak" min={-3} max={0} step={0.5}
+                  value={config.true_peak}
+                  onChange={v => updateConfig({ true_peak: v })}
+                  valueLabel={`${config.true_peak} dBTP`}
+                />
+              }
             />
-          }
-        />
+            <Row
+              label={t('config.processing.lra')}
+              hint={t('config.processing.lraHint')}
+              right={
+                <SliderRow
+                  id="lra" min={5} max={15} step={1}
+                  value={config.lra}
+                  onChange={v => updateConfig({ lra: v })}
+                  valueLabel={`${config.lra} LU`}
+                />
+              }
+            />
+          </>
+        )}
       </div>
 
       {/* Dynamics */}
       <div className="tg-grp">
         <GrpHeader>{t('config.processing.dynamics')}</GrpHeader>
         <Row
-          label={t('config.processing.compThreshold')}
-          hint={t('config.processing.compThresholdHint')}
+          label={t('config.enabled')}
           right={
-            <SliderRow
-              id="comp-threshold" min={-40} max={-10} step={1}
-              value={parseFloat(config.comp_threshold.replace(/dB$/i, ''))}
-              onChange={v => updateConfig({ comp_threshold: `${v}dB` })}
-              valueLabel={`${config.comp_threshold}`}
+            <Switch
+              checked={config.dynamics_enabled}
+              onCheckedChange={(v) => updateConfig({ dynamics_enabled: v })}
             />
           }
         />
-        <Row
-          label={t('config.processing.ratio')}
-          hint={t('config.processing.ratioHint')}
-          right={
-            <SliderRow
-              id="comp-ratio" min={2} max={10} step={1}
-              value={config.comp_ratio}
-              onChange={v => updateConfig({ comp_ratio: v })}
-              valueLabel={`${config.comp_ratio} : 1`}
+        {config.dynamics_enabled && (
+          <>
+            <Row
+              label={t('config.processing.compThreshold')}
+              hint={t('config.processing.compThresholdHint')}
+              right={
+                <SliderRow
+                  id="comp-threshold" min={-40} max={-10} step={1}
+                  value={parseFloat(config.comp_threshold.replace(/dB$/i, ''))}
+                  onChange={v => updateConfig({ comp_threshold: `${v}dB` })}
+                  valueLabel={`${config.comp_threshold}`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.processing.attack')}
-          right={
-            <SliderRow
-              id="comp-attack" min={1} max={100} step={1}
-              value={config.comp_attack}
-              onChange={v => updateConfig({ comp_attack: v })}
-              valueLabel={`${config.comp_attack} ms`}
+            <Row
+              label={t('config.processing.ratio')}
+              hint={t('config.processing.ratioHint')}
+              right={
+                <SliderRow
+                  id="comp-ratio" min={2} max={10} step={0.5}
+                  value={config.comp_ratio}
+                  onChange={v => updateConfig({ comp_ratio: v })}
+                  valueLabel={`${config.comp_ratio} : 1`}
+                />
+              }
             />
-          }
-        />
-        <Row
-          label={t('config.processing.release')}
-          right={
-            <SliderRow
-              id="comp-release" min={10} max={500} step={10}
-              value={config.comp_release}
-              onChange={v => updateConfig({ comp_release: v })}
-              valueLabel={`${config.comp_release} ms`}
+            <Row
+              label={t('config.processing.attack')}
+              right={
+                <SliderRow
+                  id="comp-attack" min={1} max={100} step={1}
+                  value={config.comp_attack}
+                  onChange={v => updateConfig({ comp_attack: v })}
+                  valueLabel={`${config.comp_attack} ms`}
+                />
+              }
             />
-          }
-        />
+            <Row
+              label={t('config.processing.release')}
+              right={
+                <SliderRow
+                  id="comp-release" min={10} max={500} step={5}
+                  value={config.comp_release}
+                  onChange={v => updateConfig({ comp_release: v })}
+                  valueLabel={`${config.comp_release} ms`}
+                />
+              }
+            />
+            <Row
+              label="Knee"
+              right={
+                <SliderRow
+                  id="comp-knee" min={0} max={12} step={0.5}
+                  value={config.comp_knee}
+                  onChange={v => updateConfig({ comp_knee: v })}
+                  valueLabel={`${config.comp_knee} dB`}
+                />
+              }
+            />
+
+            {/* dynaudnorm */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+              <Row
+                label="dynaudnorm"
+                right={
+                  <Switch
+                    checked={config.dynaudnorm_enabled}
+                    onCheckedChange={(v) => updateConfig({ dynaudnorm_enabled: v })}
+                  />
+                }
+              />
+              {config.dynaudnorm_enabled && (
+                <>
+                  <Row
+                    label="Frame Length"
+                    hint="ms"
+                    right={
+                      <SliderRow
+                        id="dynaudnorm-framelen" min={100} max={2000} step={50}
+                        value={config.dynaudnorm_framelen}
+                        onChange={v => updateConfig({ dynaudnorm_framelen: v })}
+                        valueLabel={`${config.dynaudnorm_framelen} ms`}
+                      />
+                    }
+                  />
+                  <Row
+                    label="Gauss Size"
+                    hint="奇数のみ"
+                    right={
+                      <SliderRow
+                        id="dynaudnorm-gausssize" min={3} max={31} step={2}
+                        value={config.dynaudnorm_gausssize}
+                        onChange={v => updateConfig({ dynaudnorm_gausssize: v })}
+                        valueLabel={`${config.dynaudnorm_gausssize}`}
+                      />
+                    }
+                  />
+                  <Row
+                    label="Peak"
+                    right={
+                      <SliderRow
+                        id="dynaudnorm-peak" min={0.5} max={1.0} step={0.01}
+                        value={config.dynaudnorm_peak}
+                        onChange={v => updateConfig({ dynaudnorm_peak: v })}
+                        valueLabel={`${config.dynaudnorm_peak.toFixed(2)}`}
+                      />
+                    }
+                  />
+                  <Row
+                    label="Max Gain"
+                    right={
+                      <SliderRow
+                        id="dynaudnorm-maxgain" min={1} max={30} step={1}
+                        value={config.dynaudnorm_maxgain}
+                        onChange={v => updateConfig({ dynaudnorm_maxgain: v })}
+                        valueLabel={`${config.dynaudnorm_maxgain} dB`}
+                      />
+                    }
+                  />
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
